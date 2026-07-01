@@ -140,7 +140,7 @@ CLOUDINARY_STORAGE = {
 
 # django-cloudinary-storage's own collectstatic override still reads this
 # legacy setting directly, so it must stay in sync with STORAGES["staticfiles"].
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 STORAGES = {
     "default": {
@@ -151,7 +151,7 @@ STORAGES = {
         ),
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
 
