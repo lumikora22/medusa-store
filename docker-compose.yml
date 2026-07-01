@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: medusa_store
+      POSTGRES_USER: medusa
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your shell or a root .env before starting PostgreSQL}
+    ports:
+      - "5432:5432"
+    volumes:
+      - medusa_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medusa -d medusa_store"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  medusa_postgres_data:

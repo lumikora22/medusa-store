@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "Medusa Store",
+    "slug": "medusa-store",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#111827"
+      },
+      "package": "com.luisros.medusastore"
+    },
+    "plugins": [
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d8c12894-9753-4f84-b4af-56452900949a"
+      }
+    }
+  }
+}

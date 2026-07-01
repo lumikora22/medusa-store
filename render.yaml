@@ -1,0 +1,25 @@
+databases:
+  - name: medusa-store-db
+    plan: free
+
+services:
+  - type: web
+    name: medusa-store-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: ./build.sh
+    startCommand: gunicorn medusa_store.wsgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: medusa-store-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_ALLOWED_HOSTS
+        value: medusa-store-backend.onrender.com,localhost,127.0.0.1
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://medusa-store-web.vercel.app
