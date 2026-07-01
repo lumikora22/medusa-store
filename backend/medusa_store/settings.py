@@ -138,6 +138,10 @@ CLOUDINARY_STORAGE = {
     "API_SECRET": os.getenv("CLOUDINARY_API_SECRET"),
 }
 
+# django-cloudinary-storage's own collectstatic override still reads this
+# legacy setting directly, so it must stay in sync with STORAGES["staticfiles"].
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
 STORAGES = {
     "default": {
         "BACKEND": (
