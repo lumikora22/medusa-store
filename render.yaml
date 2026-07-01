@@ -23,3 +23,9 @@ services:
         value: medusa-store-backend-zopf.onrender.com,localhost,127.0.0.1
       - key: CORS_ALLOWED_ORIGINS
         value: https://medusa-store-web.vercel.app
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
