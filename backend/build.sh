@@ -2,6 +2,7 @@
 set -o errexit
 
 pip install -r requirements.txt
+echo "CLOUDINARY_CLOUD_NAME set: $([ -n "$CLOUDINARY_CLOUD_NAME" ] && echo yes || echo no)"
 python manage.py collectstatic --no-input
 python manage.py migrate
 
