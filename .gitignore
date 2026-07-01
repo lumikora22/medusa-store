@@ -22,6 +22,9 @@ yarn-error.log*
 # CodeGraph
 .codegraph/
 
+# Local secrets
+*.local.py
+
 # OS / editors
 .DS_Store
 Thumbs.db
