@@ -2,9 +2,6 @@
   "buildCommand": "npx expo export -p web",
   "outputDirectory": "dist",
   "devCommand": "expo",
-  "env": {
-    "EXPO_PUBLIC_API_BASE_URL": "https://medusa-store-backend.onrender.com/api"
-  },
   "cleanUrls": true,
   "framework": null,
   "rewrites": [

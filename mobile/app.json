@@ -3,27 +3,57 @@
     "name": "Medusa Store",
     "slug": "medusa-store",
     "version": "0.1.0",
+    "newArchEnabled": true,
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/images/icon.png",
+    "backgroundColor": "#FAF7F0",
+    "primaryColor": "#14263D",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "icon": "./assets/images/icon.png"
     },
     "android": {
+      "icon": "./assets/images/icon.png",
       "adaptiveIcon": {
-        "backgroundColor": "#111827"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "monochromeImage": "./assets/images/adaptive-monochrome.png",
+        "backgroundColor": "#14263D"
       },
       "package": "com.luisros.medusastore"
     },
-    "plugins": [
-      "expo-secure-store"
-    ],
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
     "extra": {
       "eas": {
         "projectId": "d8c12894-9753-4f84-b4af-56452900949a"
       }
+    },
+    "plugins": [
+      "expo-font",
+      "expo-router",
+      "expo-audio",
+      "expo-asset",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#F4EBDD",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "dark": {
+            "backgroundColor": "#0D1B2A",
+            "image": "./assets/images/splash-icon-dark.png"
+          }
+        }
+      ],
+      "@react-native-community/datetimepicker"
+    ],
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }

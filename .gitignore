@@ -28,5 +28,6 @@ yarn-error.log*
 # OS / editors
 .DS_Store
 Thumbs.db
+%ProgramData%/
 .vscode/
 .idea/
