@@ -96,4 +96,8 @@ eso lo controla el sistema operativo y se configura una sola vez en el teléfono
 - [ ] Los controles principales miden al menos 48 × 48 y funcionan con tamaño de texto aumentado.
 - [ ] El teclado no oculta acciones de guardado.
 - [ ] En cada pantalla con campos, el último campo queda visible al escribir.
+- [ ] En un teléfono con botones de navegación (sin gestos), esa barra no tapa botones ni contenido.
+- [ ] La barra de acciones de selección del catálogo queda por encima de la barra de navegación.
+- [ ] En Agregar prenda se puede volver a Fotos o Información tocando el paso en el encabezado.
+- [ ] Tocar el paso Ubicación sin precio avisa y deja el flujo en Información.
 - [ ] Cerrar y volver a abrir conserva el estado persistido.

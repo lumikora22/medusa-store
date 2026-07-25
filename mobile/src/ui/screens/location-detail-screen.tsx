@@ -14,6 +14,8 @@ import { Code128View } from "../components/code128-view";
 import { FilterChip } from "../components/filter-chip";
 import { ItemCard } from "../components/item-card";
 import { ScreenState } from "../components/screen-state";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { useDialog } from "../context/dialog";
 import { useFocusLoad } from "../hooks/use-focus-load";
 
@@ -30,10 +32,11 @@ export function LocationDetailScreen() {
   if (!data) return <ScreenState title="No pudimos abrir la ubicación" body={error ?? undefined} action={<AppButton label="Reintentar" icon="reload" onPress={() => void refresh()} />} />;
   const { location, items } = data;
   const selectedIds = [...selected];
+  const insets = useSafeAreaInsets();
   const toggle = (itemId: number) => setSelected((current) => { const next = new Set(current); next.has(itemId) ? next.delete(itemId) : next.add(itemId); return next; });
   const startCount = async () => { try { const count = await inventoryService.startPhysicalCount(location.id); router.push({ pathname: "/counts/[id]", params: { id: String(count.id) } }); } catch (error) { void alert({ title: "No pudimos iniciar el conteo", message: error instanceof Error ? error.message : "Intente nuevamente.", tone: "danger" }); } };
   const openQuickView = () => router.push({ pathname: "/quick", params: { status: "active", locationId: String(location.id) } });
-  return <View style={styles.root}><FlatList key={view} data={items} numColumns={view === "grid" ? 2 : 1} columnWrapperStyle={view === "grid" ? styles.row : undefined} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <ItemCard item={item} mode={view} selected={selected.has(item.id)} selectionMode={selected.size > 0} onToggle={toggle} onPress={(itemId) => router.push({ pathname: "/items/[id]", params: { id: String(itemId) } })} />} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} ListHeaderComponent={<View style={styles.header}>
+  return <View style={styles.root}><FlatList key={view} data={items} numColumns={view === "grid" ? 2 : 1} columnWrapperStyle={view === "grid" ? styles.row : undefined} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <ItemCard item={item} mode={view} selected={selected.has(item.id)} selectionMode={selected.size > 0} onToggle={toggle} onPress={(itemId) => router.push({ pathname: "/items/[id]", params: { id: String(itemId) } })} />} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.content, { paddingBottom: 140 + insets.bottom }]} ListHeaderComponent={<View style={styles.header}>
     <View style={styles.infoCard}>
       <View style={styles.infoTop}>
         <View style={styles.infoIcon}><MaterialCommunityIcons name={locationTypeIcon(location.type)} size={26} color={colors.primary} /></View>

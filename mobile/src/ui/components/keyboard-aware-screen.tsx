@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Keyboard, type NativeScrollEvent, type NativeSyntheticEvent, ScrollView, type ScrollViewProps, TextInput, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const REVEAL_GAP = 24;
 const IS_IOS = process.env.EXPO_OS === "ios";
@@ -23,13 +24,18 @@ export function useKeyboardHeight(): number {
  * Android edge-to-edge (default since Expo SDK 54) no longer resizes the window when the
  * keyboard opens, so bottom inputs stay covered unless the content is padded and scrolled
  * explicitly. This measures the focused input and scrolls just enough to reveal it.
+ *
+ * The same edge-to-edge layout draws underneath the Android three-button navigation bar,
+ * so the trailing spacer also clears the bottom inset whenever the keyboard is closed.
  */
 export function KeyboardAwareScreen({ children, contentContainerStyle, onScroll, ...rest }: ScrollViewProps) {
   const scrollRef = useRef<ScrollView>(null);
   const offset = useRef(0);
   const frame = useRef<number | null>(null);
   const { height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const keyboardHeight = useKeyboardHeight();
+  const bottomSpace = keyboardHeight > 0 ? keyboardHeight : insets.bottom;
 
   const trackOffset = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     offset.current = event.nativeEvent.contentOffset.y;
@@ -63,6 +69,6 @@ export function KeyboardAwareScreen({ children, contentContainerStyle, onScroll,
     contentContainerStyle={contentContainerStyle}
   >
     {children}
-    {keyboardHeight > 0 ? <View style={{ height: keyboardHeight }} /> : null}
+    {bottomSpace > 0 ? <View style={{ height: bottomSpace }} /> : null}
   </ScrollView>;
 }

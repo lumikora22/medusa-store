@@ -3,6 +3,7 @@ import { FlatList, Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Tex
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { Menu, Searchbar } from "react-native-paper";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { inventoryService } from "../../application/inventory-service";
 import { DEFAULT_CATALOG_FILTERS, type CatalogFilters, type Item, type LocationSummary } from "../../domain/models";
@@ -46,6 +47,7 @@ export function CatalogScreen({ initialFilter }: CatalogScreenProps = {}) {
   const { notify } = useSnackbar();
   const { confirm } = useDialog();
   const { exhibitionMode } = useInterfaceSettings();
+  const insets = useSafeAreaInsets();
   const [sortOpen, setSortOpen] = useState(false);
   const [containerOpen, setContainerOpen] = useState(false);
   const [containerSearch, setContainerSearch] = useState("");
@@ -120,8 +122,8 @@ export function CatalogScreen({ initialFilter }: CatalogScreenProps = {}) {
     </View>
     <View style={styles.summary}><Text style={styles.summaryText}>{total} {total === 1 ? "prenda" : "prendas"}</Text></View>
     {error ? <Pressable accessibilityRole="button" onPress={() => void loadFirst()} style={styles.error}><Text style={styles.errorText}>{error} Toque para reintentar.</Text></Pressable> : null}
-    <FlatList key={view === "grid" ? "grid" : "list"} data={items} numColumns={view === "grid" ? 2 : 1} renderItem={renderItem} keyExtractor={(item) => String(item.id)} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content} columnWrapperStyle={view === "grid" ? styles.row : undefined} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void loadFirst()} tintColor={colors.primary} />} onEndReached={() => void loadMore()} onEndReachedThreshold={0.4} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={7} ListEmptyComponent={empty} ListFooterComponent={loadingMore ? <Text style={styles.loadingMore}>Cargando más prendas...</Text> : null} />
-    {selected.size > 0 && !exhibitionMode ? <View style={styles.selection}><Text style={styles.selectionText}>{selected.size} seleccionadas</Text><AppButton label="Mover" icon="swap-horizontal" onPress={() => router.push({ pathname: "/transfer", params: { ids: selectedIds.join(",") } })} /><AppButton tone="secondary" label="Etiquetas" icon="printer-outline" onPress={() => router.push({ pathname: "/labels", params: { itemIds: selectedIds.join(",") } })} /><AppButton tone="danger" label="Vender" icon="hand-coin-outline" onPress={() => void sellSelected()} /><Pressable accessibilityRole="button" accessibilityLabel="Cancelar selección" onPress={() => setSelected(new Set())} style={styles.close}><MaterialCommunityIcons name="close" size={24} color={colors.primary} /></Pressable></View> : null}
+    <FlatList key={view === "grid" ? "grid" : "list"} data={items} numColumns={view === "grid" ? 2 : 1} renderItem={renderItem} keyExtractor={(item) => String(item.id)} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.content, { paddingBottom: 140 + insets.bottom }]} columnWrapperStyle={view === "grid" ? styles.row : undefined} refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void loadFirst()} tintColor={colors.primary} />} onEndReached={() => void loadMore()} onEndReachedThreshold={0.4} initialNumToRender={8} maxToRenderPerBatch={8} windowSize={7} ListEmptyComponent={empty} ListFooterComponent={loadingMore ? <Text style={styles.loadingMore}>Cargando más prendas...</Text> : null} />
+    {selected.size > 0 && !exhibitionMode ? <View style={[styles.selection, { bottom: spacing.sm + insets.bottom }]}><Text style={styles.selectionText}>{selected.size} seleccionadas</Text><AppButton label="Mover" icon="swap-horizontal" onPress={() => router.push({ pathname: "/transfer", params: { ids: selectedIds.join(",") } })} /><AppButton tone="secondary" label="Etiquetas" icon="printer-outline" onPress={() => router.push({ pathname: "/labels", params: { itemIds: selectedIds.join(",") } })} /><AppButton tone="danger" label="Vender" icon="hand-coin-outline" onPress={() => void sellSelected()} /><Pressable accessibilityRole="button" accessibilityLabel="Cancelar selección" onPress={() => setSelected(new Set())} style={styles.close}><MaterialCommunityIcons name="close" size={24} color={colors.primary} /></Pressable></View> : null}
     <Modal visible={containerOpen} transparent animationType="slide" onRequestClose={() => setContainerOpen(false)}>
       <Pressable style={styles.pickerBackdrop} onPress={() => setContainerOpen(false)}>
         <Pressable style={styles.picker} onPress={() => undefined}>
