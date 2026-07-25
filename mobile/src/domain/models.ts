@@ -68,6 +68,11 @@ export type Item = {
   machineCode: string;
   status: ItemStatus;
   price: string;
+  /** Total pieces held by this record; every piece lives in the same location. */
+  quantity: number;
+  soldQuantity: number;
+  availableQuantity: number;
+  /** Price of the most recent sale, kept for display; each sale keeps its own in `item_sales`. */
   soldPrice: string | null;
   description: string;
   tags: string[];
@@ -79,6 +84,20 @@ export type Item = {
   updatedAt: string;
   syncStatus: SyncStatus;
   photos: ItemPhoto[];
+};
+
+/** One sale of `quantity` pieces; `restoredQuantity` tracks how many already came back. */
+export type ItemSale = {
+  id: EntityId;
+  stableId: string;
+  itemId: EntityId;
+  quantity: number;
+  restoredQuantity: number;
+  restorableQuantity: number;
+  soldPrice: string | null;
+  soldAt: string;
+  locationId: EntityId | null;
+  createdAt: string;
 };
 
 export type CatalogFilters = {
@@ -128,9 +147,11 @@ export type CreateItemInput = {
   description: string;
   tags: string[];
   locationId: EntityId | null;
+  /** Pieces held by the record; defaults to a single piece. */
+  quantity?: number;
 };
 
-export type UpdateItemInput = Partial<Pick<CreateItemInput, "code" | "price" | "description" | "tags" | "locationId">>;
+export type UpdateItemInput = Partial<Pick<CreateItemInput, "code" | "price" | "description" | "tags" | "locationId" | "quantity">>;
 
 export type CreateLocationInput = {
   code?: string;
@@ -170,15 +191,22 @@ export type HistoryFilters = {
   search?: string;
 };
 
+/** A record and how many of its pieces fell into a given count bucket. */
+export type PhysicalCountLine = { item: Item; pieces: number };
+
 export type PhysicalCountResult = {
   id: EntityId;
   locationId: EntityId;
   status: "open" | "completed" | "cancelled";
+  /** Counts are in pieces, not records: a record with 5 pieces expects 5 reads. */
   expectedCount: number;
   scannedCount: number;
-  matched: Item[];
-  unexpected: Item[];
-  missing: Item[];
+  matchedPieces: number;
+  unexpectedPieces: number;
+  missingPieces: number;
+  matched: PhysicalCountLine[];
+  unexpected: PhysicalCountLine[];
+  missing: PhysicalCountLine[];
 };
 
 export type BackupSummary = {
@@ -195,6 +223,8 @@ export type AppSettings = {
   largeInterface: boolean;
   scanSound: boolean;
   tutorialSeen: boolean;
+  exhibitionMode: boolean;
+  exhibitionPinSet: boolean;
   lastBackupAt: string | null;
   backupDue: boolean;
   backupDueInDays: number;

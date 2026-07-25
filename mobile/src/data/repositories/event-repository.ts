@@ -23,7 +23,7 @@ let eventSequence = 0;
  * and selling again on the same day. We always append a monotonic + random suffix
  * so uniqueness never depends on the caller's semantic prefix.
  */
-function uniqueStableId(base: string): string {
+export function uniqueStableId(base: string): string {
   eventSequence = (eventSequence + 1) % 0x1000000;
   const stamp = Date.now().toString(36);
   const seq = eventSequence.toString(36);

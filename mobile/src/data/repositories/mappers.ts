@@ -1,4 +1,4 @@
-import type { Item, ItemPhoto, LocationSummary, SyncStatus } from "../../domain/models";
+import type { Item, ItemPhoto, ItemSale, LocationSummary, SyncStatus } from "../../domain/models";
 
 export type Row = Record<string, unknown>;
 
@@ -76,8 +76,27 @@ export function mapPhoto(row: Row): ItemPhoto {
   };
 }
 
+export function mapItemSale(row: Row): ItemSale {
+  const quantity = Math.max(1, numberValue(row.quantity));
+  const restoredQuantity = Math.min(quantity, Math.max(0, numberValue(row.restored_quantity)));
+  return {
+    id: numberValue(row.id),
+    stableId: text(row.stable_id),
+    itemId: numberValue(row.item_id),
+    quantity,
+    restoredQuantity,
+    restorableQuantity: quantity - restoredQuantity,
+    soldPrice: nullableText(row.sold_price),
+    soldAt: text(row.sold_at),
+    locationId: row.location_id == null ? null : numberValue(row.location_id),
+    createdAt: text(row.created_at),
+  };
+}
+
 export function mapItem(row: Row, photos: ItemPhoto[]): Item {
   const hasLocation = row.location_id != null && !booleanValue(row.location_is_system);
+  const quantity = Math.max(1, numberValue(row.quantity ?? 1));
+  const soldQuantity = Math.min(quantity, Math.max(0, numberValue(row.sold_quantity)));
   return {
     id: numberValue(row.id),
     stableId: text(row.stable_id),
@@ -85,6 +104,9 @@ export function mapItem(row: Row, photos: ItemPhoto[]): Item {
     machineCode: text(row.machine_code),
     status: text(row.status) as Item["status"],
     price: text(row.price),
+    quantity,
+    soldQuantity,
+    availableQuantity: quantity - soldQuantity,
     soldPrice: nullableText(row.sold_price),
     description: text(row.description),
     tags: jsonArray(row.tags_json),
@@ -112,7 +134,7 @@ export const ITEM_SELECT = `
 
 export const LOCATION_SELECT = `
   SELECT l.*,
-    SUM(CASE WHEN i.status = 'active' THEN 1 ELSE 0 END) AS item_count,
-    SUM(CASE WHEN i.status = 'active' THEN CAST(i.price AS REAL) ELSE 0 END) AS total_value
+    SUM(CASE WHEN i.status = 'active' THEN i.quantity - i.sold_quantity ELSE 0 END) AS item_count,
+    SUM(CASE WHEN i.status = 'active' THEN (i.quantity - i.sold_quantity) * CAST(i.price AS REAL) ELSE 0 END) AS total_value
   FROM locations l LEFT JOIN items i ON i.current_location_id = l.id
 `;

@@ -19,6 +19,7 @@ function ItemCardView({ item, mode, selected = false, selectionMode = false, onP
     <View style={mode === "grid" ? styles.gridImage : styles.listImage}>
       {uri && !failed ? <Image source={uri} recyclingKey={item.stableId} contentFit="cover" cachePolicy="memory-disk" transition={120} style={styles.image} onError={() => setFailed(true)} alt={photo.altText || `Foto de ${item.code}`} /> : <View style={styles.placeholder}><MaterialCommunityIcons name="hanger" size={28} color={colors.primaryDark} /><Text style={styles.placeholderText}>Sin foto</Text></View>}
       {selectionMode ? <View style={[styles.check, selected && styles.checkSelected]}><MaterialCommunityIcons name={selected ? "check" : "plus"} size={18} color={selected ? colors.onPrimary : colors.primary} /></View> : null}
+      {item.quantity > 1 ? <View style={styles.pieces}><Text style={styles.piecesText}>{item.availableQuantity} de {item.quantity}</Text></View> : null}
     </View>
     <View style={styles.copy}>
       <View style={styles.topLine}><Text selectable numberOfLines={1} style={styles.code}>{item.code}</Text><StatusChip status={item.status} /></View>
@@ -36,7 +37,10 @@ const styles = StyleSheet.create({
   selected: { borderWidth: 2, borderColor: colors.primary }, pressed: { opacity: 0.78 }, gridImage: { aspectRatio: 0.82, backgroundColor: colors.tint }, listImage: { width: 88, height: 88, marginVertical: spacing.sm, marginLeft: spacing.sm, borderRadius: radius.md, borderCurve: "continuous", overflow: "hidden", backgroundColor: colors.tint },
   image: { width: "100%", height: "100%" }, placeholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.xs }, placeholderText: { color: colors.textMuted, fontSize: typography.small, fontWeight: "700" },
   check: { position: "absolute", top: spacing.sm, right: spacing.sm, width: 36, height: 36, alignItems: "center", justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.primary },
-  checkSelected: { backgroundColor: colors.primary }, copy: { flex: 1, padding: spacing.md, gap: spacing.sm }, topLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  checkSelected: { backgroundColor: colors.primary },
+  pieces: { position: "absolute", left: spacing.sm, bottom: spacing.sm, paddingHorizontal: spacing.sm, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.overlay },
+  piecesText: { color: colors.onPrimary, fontSize: typography.tiny, fontWeight: "900", fontVariant: ["tabular-nums"] },
+  copy: { flex: 1, padding: spacing.md, gap: spacing.sm }, topLine: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   code: { flex: 1, color: colors.textPrimary, fontSize: typography.body, fontWeight: "900" }, description: { color: colors.textMuted, fontSize: typography.small, lineHeight: 18 },
   bottomLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm }, location: { flex: 1, color: colors.primaryDark, fontSize: typography.tiny, fontWeight: "700" }, price: { color: colors.success, fontSize: typography.small, fontWeight: "900", fontVariant: ["tabular-nums"] },
 });

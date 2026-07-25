@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { Asset } from "expo-asset";
 import { router } from "expo-router";
 
@@ -7,15 +7,24 @@ import { inventoryService } from "../../application/inventory-service";
 import { colors, inputStyle, radius, spacing, typography } from "../../theme/tokens";
 import { formatDate } from "../../utils/format";
 import { AppButton } from "../components/app-button";
+import { ExhibitionPinDialog } from "../components/exhibition-pin-dialog";
+import { KeyboardAwareScreen } from "../components/keyboard-aware-screen";
 import { ScreenState } from "../components/screen-state";
 import { useDialog } from "../context/dialog";
 import { useInterfaceSettings } from "../context/interface-settings";
 import { SEED_IMAGE_MODULES } from "../seed-images";
 
 export function SettingsScreen() {
-  const { settings, update, refresh } = useInterfaceSettings();
+  const { settings, update, refresh, enableExhibition } = useInterfaceSettings();
   const { alert, confirm } = useDialog();
   const [days, setDays] = useState("7"); const [saving, setSaving] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false); const [lockBusy, setLockBusy] = useState(false);
+
+  const startExhibition = async (pin: string) => {
+    setLockBusy(true);
+    try { await enableExhibition(pin); setPinOpen(false); router.replace("/catalog"); }
+    finally { setLockBusy(false); }
+  };
   const [devBusy, setDevBusy] = useState(false); const [devProgress, setDevProgress] = useState<string | null>(null);
 
   const seedDev = async () => {
@@ -46,11 +55,12 @@ export function SettingsScreen() {
     if (!Number.isInteger(value) || value < 1 || value > 365) { void alert({ title: "Revise el recordatorio", message: "Use un número entero entre 1 y 365 días." }); return; }
     setSaving(true); try { await update("backupReminderDays", value); } finally { setSaving(false); }
   };
-  return <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+  return <KeyboardAwareScreen contentContainerStyle={styles.content}>
     <View style={styles.card}><View style={styles.row}><View style={styles.copy}><Text style={styles.title}>Interfaz grande</Text><Text style={styles.text}>Aumenta texto, botones, filtros y encabezados de navegación.</Text></View><Switch accessibilityLabel="Interfaz grande" hitSlop={14} value={settings.largeInterface} onValueChange={(value) => void update("largeInterface", value)} trackColor={{ true: colors.primary, false: colors.border }} /></View></View>
     <View style={styles.card}><View style={styles.row}><View style={styles.copy}><Text style={styles.title}>Sonido de escaneo</Text><Text style={styles.text}>Reproduce una confirmación breve cuando la plataforma permite audio. La vibración y confirmación visual siempre permanecen activas.</Text></View><Switch accessibilityLabel="Sonido de escaneo" hitSlop={14} value={settings.scanSound} onValueChange={(value) => void update("scanSound", value)} trackColor={{ true: colors.primary, false: colors.border }} /></View></View>
     <View style={styles.card}><Text style={styles.title}>Recordatorio de respaldo</Text><Text style={styles.text}>Último respaldo: {formatDate(settings.lastBackupAt)}</Text><View accessibilityLabel={settings.backupDue ? "Respaldo pendiente" : `Próximo respaldo en ${settings.backupDueInDays} días`} style={[styles.reminder, settings.backupDue && styles.reminderDue]}><Text style={[styles.reminderText, settings.backupDue && styles.reminderDueText]}>{settings.backupDue ? "Respaldo pendiente: cree una copia hoy." : `Próximo respaldo en ${settings.backupDueInDays} días.`}</Text></View><Text style={styles.label}>Días entre respaldos</Text><View style={styles.saveRow}><TextInput accessibilityLabel="Días entre respaldos" value={days} onChangeText={setDays} keyboardType="number-pad" returnKeyType="done" onSubmitEditing={() => void saveDays()} style={styles.input} /><AppButton label={saving ? "Guardando..." : "Guardar recordatorio"} icon="content-save-outline" onPress={() => void saveDays()} disabled={saving} /></View></View>
     <View style={styles.card}><Text style={styles.title}>Tutorial</Text><Text style={styles.text}>Vuelve a ver la guía rápida de la aplicación paso a paso.</Text><AppButton tone="secondary" label="Ver tutorial de nuevo" icon="school-outline" onPress={() => void update("tutorialSeen", false).then(() => router.replace("/"))} /></View>
+    <View style={styles.card}><Text style={styles.title}>Modo exhibición</Text><Text style={styles.text}>Deja la aplicación en el catálogo, solo para mostrar prendas. La búsqueda y los filtros siguen funcionando; agregar, editar, mover, vender y archivar quedan fuera de alcance. Para salir se pide un PIN de 4 dígitos.</Text><Text style={styles.text}>Si olvida el PIN, podrá salir confirmando el bloqueo del teléfono (huella, rostro o PIN del dispositivo). No hace falta borrar nada.</Text><Text style={styles.text}>Para que tampoco se pueda salir de la aplicación, active además Acceso Guiado en iOS o Fijar Pantalla en Android desde los ajustes del teléfono.</Text><AppButton tone="secondary" label="Activar modo exhibición" icon="lock-outline" onPress={() => setPinOpen(true)} /></View>
     <View style={styles.local}><Text style={styles.localTitle}>Modo local-first</Text><Text style={styles.text}>SQLite es la fuente de verdad en este dispositivo. Cada teléfono conserva su propia copia hasta implementar sincronización.</Text></View>
     {__DEV__ ? <View style={styles.devCard}>
       <Text style={styles.devTitle}>⚙︎ Herramientas de desarrollo</Text>
@@ -59,7 +69,8 @@ export function SettingsScreen() {
       <AppButton label="Poblar datos de prueba" icon="database-plus-outline" onPress={() => void seedDev()} disabled={devBusy} />
       <AppButton tone="danger" label="Vaciar toda la app" icon="delete-alert-outline" onPress={() => void wipeApp()} disabled={devBusy} />
     </View> : null}
-  </ScrollView>;
+    <ExhibitionPinDialog visible={pinOpen} mode="set" busy={lockBusy} onCancel={() => setPinOpen(false)} onSubmit={startExhibition} />
+  </KeyboardAwareScreen>;
 }
 
 const styles = StyleSheet.create({ content: { padding: spacing.lg, paddingBottom: 100, gap: spacing.md, backgroundColor: colors.canvas }, card: { gap: spacing.md, padding: spacing.lg, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }, row: { flexDirection: "row", alignItems: "center", gap: spacing.md }, copy: { flex: 1, gap: spacing.xs }, title: { color: colors.textPrimary, fontSize: typography.title, fontWeight: "900" }, text: { color: colors.textMuted, fontSize: typography.body, lineHeight: 21 }, label: { color: colors.textSecondary, fontWeight: "800" }, input: { ...inputStyle, width: 100 }, saveRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: spacing.sm }, reminder: { minHeight: 48, justifyContent: "center", padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tint }, reminderDue: { backgroundColor: colors.dangerSoft }, reminderText: { color: colors.primary, fontWeight: "800" }, reminderDueText: { color: colors.danger }, local: { gap: spacing.sm, padding: spacing.lg, borderRadius: radius.xl, backgroundColor: colors.tint }, localTitle: { color: colors.primary, fontSize: typography.title, fontWeight: "900" }, devCard: { gap: spacing.md, padding: spacing.lg, borderRadius: radius.xl, borderCurve: "continuous", borderWidth: 1, borderStyle: "dashed", borderColor: colors.primaryDark, backgroundColor: colors.surface }, devTitle: { color: colors.primaryDark, fontSize: typography.title, fontWeight: "900" }, devProgress: { flexDirection: "row", alignItems: "center", gap: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.tint }, devProgressText: { color: colors.primary, fontWeight: "800", fontVariant: ["tabular-nums"] } });

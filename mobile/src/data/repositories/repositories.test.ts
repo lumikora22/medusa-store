@@ -92,19 +92,144 @@ describe("inventory repositories", () => {
     assert.equal(resold.status, "sold");
   });
 
-  it("persists physical count matched, duplicate, unexpected, missing and completion results", async () => {
+  it("persists physical count matched, extra, missing and completion results", async () => {
     const rack = await createLocation("RACK-COUNT"); const otherRack = await createLocation("RACK-OTHER"); const expectedA = await createItem("COUNT-A", rack.id); const expectedB = await createItem("COUNT-B", rack.id); const extra = await createItem("COUNT-X", otherRack.id);
     const counts = new PhysicalCountRepository(items); const count = await counts.start(rack.id); assert.equal(count.expectedCount, 2);
-    assert.equal(await counts.scan(count.id, expectedA.id), "matched"); assert.equal(await counts.scan(count.id, expectedA.id), "duplicate"); assert.equal(await counts.scan(count.id, extra.id), "unexpected");
-    const open = await counts.get(count.id); assert.deepEqual(open.matched.map((item) => item.id), [expectedA.id]); assert.deepEqual(open.missing.map((item) => item.id), [expectedB.id]); assert.deepEqual(open.unexpected.map((item) => item.id), [extra.id]);
+    assert.equal(await counts.scan(count.id, expectedA.id), "matched");
+    assert.equal(await counts.scan(count.id, expectedA.id), "unexpected", "a second read of a single-piece record is a surplus, not a silent duplicate");
+    assert.equal(await counts.scan(count.id, extra.id), "unexpected");
+    const open = await counts.get(count.id);
+    assert.deepEqual(open.matched.map((line) => [line.item.id, line.pieces]), [[expectedA.id, 1]]);
+    assert.deepEqual(open.missing.map((line) => [line.item.id, line.pieces]), [[expectedB.id, 1]]);
+    assert.deepEqual(open.unexpected.map((line) => [line.item.id, line.pieces]).sort((a, b) => a[0] - b[0]), [[expectedA.id, 1], [extra.id, 1]]);
+    assert.equal(open.matchedPieces, 1); assert.equal(open.unexpectedPieces, 2); assert.equal(open.missingPieces, 1);
     const completed = await counts.finish(count.id); assert.equal(completed.status, "completed");
     const events = await new EventRepository().list({ type: "physical_count_completed" }); assert.equal(events.length, 1);
     const cancelled = await counts.start(rack.id); assert.equal((await counts.cancel(cancelled.id)).status, "cancelled");
+  });
+
+  it("sells part of a record and leaves the rest available in the catalog", async () => {
+    const rack = await createLocation("RACK-PIECES"); const item = await createItem("PIECES-A", rack.id, "40.00");
+    await database.runAsync("UPDATE items SET quantity = 5 WHERE id = ?", item.id);
+
+    const partial = await sales.sell(item.id, { quantity: 2, soldPrice: "35.00" });
+    assert.equal(partial.status, "active", "a record with pieces left stays in the normal catalog");
+    assert.equal(partial.soldQuantity, 2); assert.equal(partial.availableQuantity, 3);
+
+    const rest = await sales.sell(item.id, { quantity: 3 });
+    assert.equal(rest.status, "sold", "the record only becomes sold once every piece is gone");
+    assert.equal(rest.availableQuantity, 0);
+
+    await assert.rejects(sales.sell(item.id, { quantity: 1 }), /solo tiene 0 piezas disponibles/);
+  });
+
+  it("refuses to sell more pieces than the record holds without touching anything", async () => {
+    const rack = await createLocation("RACK-SHORT"); const item = await createItem("SHORT-A", rack.id); const other = await createItem("SHORT-B", rack.id);
+    await database.runAsync("UPDATE items SET quantity = 3 WHERE id = ?", other.id);
+    await assert.rejects(sales.sellMany([other.id, item.id], { quantity: 2 }), /solo tiene 1 pieza disponible/);
+    assert.equal((await items.getById(other.id)).soldQuantity, 0, "the valid record must not be modified either");
+    assert.equal((await sales.salesOf(other.id)).length, 0);
+  });
+
+  it("restores the most recent sale by default and walks history backwards for larger amounts", async () => {
+    const rack = await createLocation("RACK-HISTORY"); const item = await createItem("HISTORY-A", rack.id);
+    await database.runAsync("UPDATE items SET quantity = 6 WHERE id = ?", item.id);
+    await sales.sell(item.id, { quantity: 2, soldAt: "2025-05-01T00:00:00.000Z", soldPrice: "30.00" });
+    await sales.sell(item.id, { quantity: 3, soldAt: "2025-05-10T00:00:00.000Z", soldPrice: "25.00" });
+
+    const afterDefault = await sales.restore(item.id, "Cliente devolvió");
+    assert.equal(afterDefault.soldQuantity, 2, "restoring without a quantity undoes only the last sale");
+    assert.equal(afterDefault.availableQuantity, 4);
+    assert.equal(afterDefault.soldPrice, "30.00", "the displayed price falls back to the remaining open sale");
+
+    const history = await sales.salesOf(item.id);
+    assert.deepEqual(history.map((sale) => [sale.quantity, sale.restoredQuantity]), [[3, 3], [2, 0]]);
+
+    const afterPartial = await sales.restore(item.id, "Segunda devolución", 1);
+    assert.equal(afterPartial.soldQuantity, 1); assert.equal(afterPartial.availableQuantity, 5);
+    assert.equal((await sales.salesOf(item.id)).find((sale) => sale.quantity === 2)?.restoredQuantity, 1);
+
+    await assert.rejects(sales.restore(item.id, "Demasiadas", 4), /solo tiene 1 pieza vendida/);
+  });
+
+  it("counts every piece of a record before reporting a surplus", async () => {
+    const rack = await createLocation("RACK-PHYS"); const item = await createItem("PHYS-A", rack.id); const single = await createItem("PHYS-B", rack.id);
+    await database.runAsync("UPDATE items SET quantity = 3 WHERE id = ?", item.id);
+    const counts = new PhysicalCountRepository(items);
+    const count = await counts.start(rack.id);
+    assert.equal(count.expectedCount, 4, "three pieces plus one single-piece record");
+
+    assert.equal(await counts.scan(count.id, item.id), "matched");
+    assert.equal(await counts.scan(count.id, item.id), "matched");
+    assert.equal(await counts.scan(count.id, item.id), "matched", "each expected piece counts on its own read");
+    assert.equal(await counts.scan(count.id, item.id), "unexpected", "the fourth read exceeds what the container should hold");
+
+    const open = await counts.get(count.id);
+    assert.equal(open.matchedPieces, 3); assert.equal(open.unexpectedPieces, 1);
+    assert.deepEqual(open.missing.map((line) => [line.item.id, line.pieces]), [[single.id, 1]]);
+    assert.equal(open.scannedCount, 4);
+  });
+
+  it("excludes already sold pieces from what a count expects", async () => {
+    const rack = await createLocation("RACK-SOLDOUT"); const item = await createItem("SOLDOUT-A", rack.id);
+    await database.runAsync("UPDATE items SET quantity = 4 WHERE id = ?", item.id);
+    await sales.sell(item.id, { quantity: 3 });
+    const counts = new PhysicalCountRepository(items);
+    const count = await counts.start(rack.id);
+    assert.equal(count.expectedCount, 1, "only the piece still in the container is expected");
+    assert.equal(await counts.scan(count.id, item.id), "matched");
+    assert.equal(await counts.scan(count.id, item.id), "unexpected");
+  });
+
+  it("edits piece count but never below what is already sold", async () => {
+    const rack = await createLocation("RACK-EDIT"); const item = await createItem("EDIT-A", rack.id);
+    const grown = await items.update(item.id, { quantity: 4 });
+    assert.equal(grown.quantity, 4); assert.equal(grown.availableQuantity, 4);
+
+    await sales.sell(item.id, { quantity: 3 });
+    await assert.rejects(items.update(item.id, { quantity: 2 }), /Restaure ventas antes de reducir/);
+    assert.equal((await items.getById(item.id)).quantity, 4, "the rejected edit must not change anything");
+
+    const shrunk = await items.update(item.id, { quantity: 3 });
+    assert.equal(shrunk.status, "sold", "reducing to exactly the sold count leaves nothing available");
+    assert.equal(shrunk.availableQuantity, 0);
+    await assert.rejects(items.update(item.id, { quantity: 0 }), /al menos 1/);
+  });
+
+  it("counts pieces, not records, in dashboard and location totals", async () => {
+    const rack = await createLocation("RACK-COUNT"); const item = await createItem("COUNT-A", rack.id, "10.00");
+    await database.runAsync("UPDATE items SET quantity = 4 WHERE id = ?", item.id);
+    await sales.sell(item.id, { quantity: 1, soldPrice: "10.00" });
+
+    const dashboard = await items.dashboard();
+    assert.equal(dashboard.activeCount, 3); assert.equal(dashboard.soldCount, 1);
+    assert.equal(dashboard.activeValue, "30.00"); assert.equal(dashboard.soldValue, "10.00");
+
+    const location = await locations.getById(rack.id);
+    assert.equal(location.itemCount, 3, "a container holds pieces, not catalog rows");
+    assert.equal(location.totalValue, "30.00");
   });
 
   it("computes and persists backup reminder settings", async () => {
     const settings = new SettingsRepository(); assert.equal((await settings.get()).backupDue, true);
     await settings.set("backupReminderDays", 14); await database.runAsync("INSERT INTO backup_history(stable_id, file_uri, checksum, item_count, location_count, photo_count, status, created_at) VALUES ('BACKUP-TEST', 'memory://backup', 'hash', 0, 0, 0, 'created', ?)", new Date().toISOString());
     const updated = await settings.get(); assert.equal(updated.backupReminderDays, 14); assert.equal(updated.backupDue, false); assert.equal(updated.backupDueInDays, 14);
+  });
+
+  it("stores, reports and clears the exhibition PIN without exposing it", async () => {
+    const settings = new SettingsRepository();
+    const initial = await settings.get(); assert.equal(initial.exhibitionMode, false); assert.equal(initial.exhibitionPinSet, false);
+    assert.equal(await settings.getExhibitionPin(), null);
+
+    await settings.setExhibitionPin("saltvalue:digestvalue"); await settings.set("exhibitionMode", true);
+    const locked = await settings.get();
+    assert.equal(locked.exhibitionMode, true); assert.equal(locked.exhibitionPinSet, true);
+    assert.equal(await settings.getExhibitionPin(), "saltvalue:digestvalue");
+    assert.ok(!Object.values(locked).includes("saltvalue:digestvalue"), "the stored digest must never reach AppSettings");
+
+    await settings.clearExhibitionPin(); await settings.set("exhibitionMode", false);
+    const recovered = await settings.get();
+    assert.equal(recovered.exhibitionMode, false); assert.equal(recovered.exhibitionPinSet, false);
+    assert.equal(await settings.getExhibitionPin(), null);
   });
 });

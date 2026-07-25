@@ -55,7 +55,7 @@ export function LocationDetailScreen() {
     </View>
     {editing ? <LocationEditor location={location} onSaved={() => { setEditing(false); void refresh(); }} /> : null}
     {showCodes ? <View style={styles.codes}><QRCode value={location.machineCode} size={150} color={colors.primary} backgroundColor={colors.surface} /><View style={styles.barcode}><Code128View value={location.machineCode} /><Text selectable style={styles.machine}>{location.machineCode}</Text></View><AppButton label="Imprimir etiqueta" icon="printer-outline" onPress={() => router.push({ pathname: "/labels", params: { locationIds: String(location.id) } })} /></View> : null}
-    <Searchbar accessibilityLabel="Buscar dentro de la ubicación" value={search} onChangeText={setSearch} placeholder="Buscar prendas en esta ubicación" style={styles.search} />
+    <Searchbar accessibilityLabel="Buscar dentro de la ubicación" value={search} onChangeText={setSearch} placeholder="Buscar prendas" maxFontSizeMultiplier={1.4} style={styles.search} />
     <View style={styles.contentBar}>
       <Text style={styles.listTitle}>Contenido ({location.itemCount})</Text>
       <View style={styles.viewControls}>

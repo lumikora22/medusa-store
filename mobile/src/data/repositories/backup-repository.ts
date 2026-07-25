@@ -1,10 +1,12 @@
 import { getDatabase, inTransaction, type DatabaseBindValue, type DatabaseClient } from "../sqlite/database";
+import { reconcilePieceCounters } from "../sqlite/migrations";
 import { DomainError } from "../../domain/errors";
 
 export const BACKUP_TABLES = [
   "containers",
   "locations",
   "items",
+  "item_sales",
   "item_photos",
   "inventory_movements",
   "transfer_batches",
@@ -21,11 +23,11 @@ export type BackupTables = Record<BackupTable, Array<Record<string, unknown>>>;
 
 const DELETE_ORDER: BackupTable[] = [
   "physical_count_entries", "physical_counts", "inventory_events", "transfer_batches", "code_registry",
-  "item_photos", "items", "locations", "inventory_movements", "containers", "backup_history", "app_settings",
+  "item_photos", "item_sales", "items", "locations", "inventory_movements", "containers", "backup_history", "app_settings",
 ];
 
 const INSERT_ORDER: BackupTable[] = [
-  "containers", "locations", "items", "item_photos", "inventory_movements", "transfer_batches",
+  "containers", "locations", "items", "item_sales", "item_photos", "inventory_movements", "transfer_batches",
   "inventory_events", "code_registry", "app_settings", "backup_history", "physical_counts", "physical_count_entries",
 ];
 
@@ -67,6 +69,8 @@ export class BackupRepository {
         }
       }
       for (const [itemId, photoId] of primaryPhotoIds) await transaction.runAsync("UPDATE items SET primary_photo_id = ? WHERE id = ?", photoId, itemId);
+      // A pre-v4 backup carries no sales and no piece counters; rebuild them from item status.
+      await reconcilePieceCounters(transaction);
       const foreignKeyViolations = await transaction.getAllAsync<Record<string, unknown>>("PRAGMA foreign_key_check");
       const integrity = await transaction.getFirstAsync<{ integrity_check: string }>("PRAGMA integrity_check");
       if (foreignKeyViolations.length || integrity?.integrity_check !== "ok") throw new DomainError("El respaldo no supera la validación de integridad de SQLite.", "backup_database_integrity_failed");

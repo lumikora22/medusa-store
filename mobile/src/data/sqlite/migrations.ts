@@ -1,7 +1,7 @@
 import { DomainError } from "../../domain/errors";
 import { getDatabase, inTransaction, type DatabaseClient } from "./database";
 
-export const DATABASE_VERSION = 3;
+export const DATABASE_VERSION = 5;
 type SafetySnapshot = (database: DatabaseClient, label: string) => Promise<string | null>;
 const noSafetySnapshot: SafetySnapshot = async () => null;
 
@@ -252,6 +252,78 @@ async function applyV3(database: DatabaseClient, safetySnapshot: SafetySnapshot)
   });
 }
 
+/**
+ * Rebuilds the piece counters from the sales history.
+ *
+ * Shared by migration v4 and by backup restore, so the invariant
+ * `sold_quantity = SUM(quantity - restored_quantity)` has exactly one definition. Restoring
+ * a pre-v4 backup lands items with no sales rows, and this rebuilds them from item status.
+ */
+export async function reconcilePieceCounters(database: DatabaseClient): Promise<void> {
+  await database.execAsync(`
+    INSERT OR IGNORE INTO item_sales (stable_id, item_id, quantity, restored_quantity, sold_price, sold_at, location_id, created_at)
+    SELECT printf('SALE-LEGACY-%06d', i.id), i.id, 1, 0, i.sold_price,
+      COALESCE(i.sold_at, i.updated_at, i.created_at),
+      COALESCE(i.last_location_id, i.current_location_id, -1),
+      COALESCE(i.sold_at, i.updated_at, i.created_at)
+    FROM items i
+    WHERE i.status = 'sold' AND NOT EXISTS (SELECT 1 FROM item_sales s WHERE s.item_id = i.id);
+
+    UPDATE items SET quantity = 1 WHERE quantity < 1;
+    UPDATE items SET sold_quantity = (
+      SELECT COALESCE(SUM(s.quantity - s.restored_quantity), 0) FROM item_sales s WHERE s.item_id = items.id
+    );
+    UPDATE items SET quantity = sold_quantity WHERE sold_quantity > quantity;
+  `);
+}
+
+/**
+ * v4 turns an item from "one physical garment" into "a catalog record holding N pieces".
+ *
+ * Sale price and date move from the item to `item_sales`, because with partial sales an
+ * item no longer has a single sale price. Each sale keeps how many of its pieces were
+ * already returned, so restoring walks the history newest-first and can restore partially.
+ * `items.sold_quantity` stays denormalized for catalog queries and is always the sum of
+ * `quantity - restored_quantity` over that item's sales.
+ */
+async function applyV4(database: DatabaseClient, safetySnapshot: SafetySnapshot): Promise<void> {
+  await safetySnapshot(database, "before-v4");
+  await inTransaction(database, async (transaction) => {
+    const timestamp = now();
+    await addColumn(transaction, "items", "quantity", "INTEGER NOT NULL DEFAULT 1");
+    await addColumn(transaction, "items", "sold_quantity", "INTEGER NOT NULL DEFAULT 0");
+    await transaction.execAsync(`
+      CREATE TABLE IF NOT EXISTS item_sales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, stable_id TEXT NOT NULL UNIQUE,
+        item_id INTEGER NOT NULL REFERENCES items(id) ON DELETE CASCADE,
+        quantity INTEGER NOT NULL CHECK(quantity > 0),
+        restored_quantity INTEGER NOT NULL DEFAULT 0 CHECK(restored_quantity >= 0),
+        sold_price TEXT, sold_at TEXT NOT NULL, location_id INTEGER, created_at TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_item_sales_item ON item_sales(item_id, sold_at DESC, id DESC);
+    `);
+    await reconcilePieceCounters(transaction);
+    await transaction.runAsync("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (4, ?)", timestamp);
+    await transaction.execAsync(`PRAGMA user_version = ${DATABASE_VERSION};`);
+  });
+}
+
+/**
+ * v5 makes physical counts count pieces. An entry now carries how many reads it collected,
+ * and the count freezes the expected pieces per record instead of a plain list of ids.
+ * Counts already open keep working: a missing map falls back to one piece per frozen id.
+ */
+async function applyV5(database: DatabaseClient, safetySnapshot: SafetySnapshot): Promise<void> {
+  await safetySnapshot(database, "before-v5");
+  await inTransaction(database, async (transaction) => {
+    const timestamp = now();
+    await addColumn(transaction, "physical_count_entries", "quantity", "INTEGER NOT NULL DEFAULT 1");
+    await addColumn(transaction, "physical_counts", "expected_pieces_json", "TEXT NOT NULL DEFAULT '{}'");
+    await transaction.runAsync("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (5, ?)", timestamp);
+    await transaction.execAsync(`PRAGMA user_version = ${DATABASE_VERSION};`);
+  });
+}
+
 export async function initializeDatabase(safetySnapshot: SafetySnapshot = noSafetySnapshot): Promise<void> {
   const database = await getDatabase();
   await migrateDatabase(database, safetySnapshot);
@@ -266,5 +338,7 @@ export async function migrateDatabase(database: DatabaseClient, safetySnapshot: 
     version = 1;
   }
   if (version < 2) { await applyV2(database, safetySnapshot); version = 2; }
-  if (version < 3) await applyV3(database, safetySnapshot);
+  if (version < 3) { await applyV3(database, safetySnapshot); version = 3; }
+  if (version < 4) { await applyV4(database, safetySnapshot); version = 4; }
+  if (version < 5) await applyV5(database, safetySnapshot);
 }

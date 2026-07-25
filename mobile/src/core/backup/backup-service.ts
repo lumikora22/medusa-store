@@ -5,7 +5,15 @@ import { PhotoStorage, type PhotoPromotion } from "../files/photo-storage";
 
 const BACKUP_FORMAT = "medusa-store-backup";
 const BACKUP_VERSION = 2;
-const BACKUP_SCHEMA_VERSION = 3;
+const BACKUP_SCHEMA_VERSION = 4;
+/**
+ * Schema versions a restore still accepts. Schema 3 predates per-piece sales: it carries no
+ * `item_sales` table, and the restore rebuilds the piece counters from item status instead.
+ * Rejecting it would turn every backup taken before this release into an unreadable file.
+ */
+const SUPPORTED_SCHEMA_VERSIONS: readonly number[] = [3, 4];
+/** Tables introduced after the oldest supported schema, so older packages may omit them. */
+const OPTIONAL_TABLES: readonly string[] = ["item_sales"];
 
 export type BackupPhoto = { photoId: number; stableId: string; fileName: string; mimeType: string; contentBase64: string; checksum: string };
 
@@ -70,11 +78,13 @@ function counts(value: BackupPackage): Pick<BackupSummary, "itemCount" | "locati
 function assertBackupShape(value: unknown): asserts value is BackupPackage {
   if (!value || typeof value !== "object") throw new DomainError("El archivo no contiene un respaldo válido de Medusa Store.", "invalid_backup");
   const backup = value as Partial<BackupPackage>;
-  if (backup.format !== BACKUP_FORMAT || backup.version !== BACKUP_VERSION || backup.schemaVersion !== BACKUP_SCHEMA_VERSION || !backup.tables || !Array.isArray(backup.photos) || !backup.createdAt || !backup.checksum) {
+  if (backup.format !== BACKUP_FORMAT || backup.version !== BACKUP_VERSION || !SUPPORTED_SCHEMA_VERSIONS.includes(Number(backup.schemaVersion)) || !backup.tables || !Array.isArray(backup.photos) || !backup.createdAt || !backup.checksum) {
     throw new DomainError("El formato o la versión del respaldo no es compatible.", "unsupported_backup");
   }
   for (const table of BACKUP_TABLES) {
-    if (!Array.isArray(backup.tables[table])) throw new DomainError(`El respaldo no contiene la tabla ${table}.`, "invalid_backup_manifest");
+    if (Array.isArray(backup.tables[table])) continue;
+    if (OPTIONAL_TABLES.includes(table) && Number(backup.schemaVersion) < BACKUP_SCHEMA_VERSION) continue;
+    throw new DomainError(`El respaldo no contiene la tabla ${table}.`, "invalid_backup_manifest");
   }
 }
 

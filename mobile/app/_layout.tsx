@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { Stack } from "expo-router";
+import { Stack, router, usePathname } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { PaperProvider } from "react-native-paper";
 
@@ -20,6 +20,22 @@ import { SnackbarProvider } from "../src/ui/context/snackbar";
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 const paperSettings = { icon: ({ name, color, size }: { name: string; color?: string; size: number }) => <MaterialCommunityIcons name={name as IconName} color={color} size={size} /> };
 
+/** The only routes reachable while Exhibition Mode is on: browse the catalog, nothing else. */
+const EXHIBITION_ROUTES = ["/catalog", "/quick"];
+
+/**
+ * Enforces Exhibition Mode at the route level so a deep link, a stale back stack, or any
+ * stray navigation cannot land on a screen that can modify inventory.
+ */
+function ExhibitionGuard() {
+  const { exhibitionMode } = useInterfaceSettings();
+  const pathname = usePathname();
+  useEffect(() => {
+    if (exhibitionMode && !EXHIBITION_ROUTES.includes(pathname)) router.replace("/catalog");
+  }, [exhibitionMode, pathname]);
+  return null;
+}
+
 function AppStack() {
   const { largeInterface, textBoost } = useInterfaceSettings();
   return <PaperProvider theme={createPaperTheme(largeInterface)} settings={paperSettings}><StatusBar style="dark" /><DialogProvider><SnackbarProvider><Stack screenOptions={{ contentStyle: { backgroundColor: colors.canvas }, headerStyle: { backgroundColor: colors.surface }, headerTintColor: colors.primary, headerTitleStyle: { color: colors.textPrimary, fontWeight: "800", fontSize: 17 + textBoost }, headerShadowVisible: false, headerBackButtonDisplayMode: "minimal" }}>
@@ -31,7 +47,7 @@ function AppStack() {
     <Stack.Screen name="backup" options={{ title: "Respaldo y restauración" }} /><Stack.Screen name="settings" options={{ title: "Ajustes" }} />
     <Stack.Screen name="sold" options={{ title: "Vendidas" }} />
     <Stack.Screen name="quick" options={{ headerShown: false, presentation: "fullScreenModal", animation: "fade" }} />
-  </Stack></SnackbarProvider><CoachTour /></DialogProvider></PaperProvider>;
+  </Stack><ExhibitionGuard /></SnackbarProvider><CoachTour /></DialogProvider></PaperProvider>;
 }
 
 export default function RootLayout() {

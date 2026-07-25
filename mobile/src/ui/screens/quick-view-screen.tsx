@@ -12,6 +12,7 @@ import { colors, radius, spacing, typography } from "../../theme/tokens";
 import { formatMoney, itemStatusLabel } from "../../utils/format";
 import { AppButton } from "../components/app-button";
 import { ScreenState } from "../components/screen-state";
+import { useInterfaceSettings } from "../context/interface-settings";
 import { useSnackbar } from "../context/snackbar";
 
 type QuickParams = { status?: string; search?: string; unassignedOnly?: string; photo?: string; sort?: string; locationId?: string };
@@ -33,6 +34,7 @@ export function QuickViewScreen() {
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
   const { notify } = useSnackbar();
+  const { exhibitionMode } = useInterfaceSettings();
   const [items, setItems] = useState<Item[]>([]);
   const [nextOffset, setNextOffset] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,7 @@ export function QuickViewScreen() {
       insetTop={insets.top}
       insetBottom={insets.bottom}
       immersive={immersive}
+      readOnly={exhibitionMode}
       onHold={setImmersive}
       onOpen={(id) => router.push({ pathname: "/items/[id]", params: { id: String(id) } })}
       onEdit={(id) => router.push({ pathname: "/items/[id]", params: { id: String(id), edit: "1" } })}
@@ -87,7 +90,7 @@ export function QuickViewScreen() {
       onPrint={(id) => router.push({ pathname: "/labels", params: { itemIds: String(id) } })}
       onSell={sell}
     />
-  ), [height, immersive, insets.bottom, insets.top, sell, width]);
+  ), [exhibitionMode, height, immersive, insets.bottom, insets.top, sell, width]);
 
   return (
     <View style={styles.root}>
@@ -128,8 +131,8 @@ export function QuickViewScreen() {
   );
 }
 
-function QuickPage({ item, width, height, insetTop, insetBottom, immersive, onHold, onOpen, onEdit, onMove, onPrint, onSell }: {
-  item: Item; width: number; height: number; insetTop: number; insetBottom: number; immersive: boolean; onHold: (value: boolean) => void;
+function QuickPage({ item, width, height, insetTop, insetBottom, immersive, readOnly, onHold, onOpen, onEdit, onMove, onPrint, onSell }: {
+  item: Item; width: number; height: number; insetTop: number; insetBottom: number; immersive: boolean; readOnly: boolean; onHold: (value: boolean) => void;
   onOpen: (id: number) => void; onEdit: (id: number) => void; onMove: (id: number) => void; onPrint: (id: number) => void; onSell: (item: Item) => void;
 }) {
   const photos = item.photos.length ? item.photos : [null];
@@ -186,15 +189,18 @@ function QuickPage({ item, width, height, insetTop, insetBottom, immersive, onHo
               <MaterialCommunityIcons name="map-marker-radius-outline" size={16} color={colors.tintStrong} />
               <Text numberOfLines={1} style={styles.location}>{item.currentLocation?.name ?? "Sin asignar"}</Text>
             </View>
-            <View style={styles.actions}>
-              <AppButton grow label="Ver" icon="eye-outline" onPress={() => onOpen(item.id)} />
-              <AppButton grow tone="secondary" label="Editar" icon="pencil-outline" onPress={() => onEdit(item.id)} />
-            </View>
-            <View style={styles.actions}>
-              <AppButton grow tone="secondary" label="Mover" icon="swap-horizontal" disabled={item.status !== "active"} onPress={() => onMove(item.id)} />
-              <AppButton grow tone="secondary" label="Imprimir" icon="printer-outline" onPress={() => onPrint(item.id)} />
-              {item.status === "active" ? <AppButton grow tone="danger" label="Vender" icon="hand-coin-outline" onPress={() => onSell(item)} /> : null}
-            </View>
+            {item.quantity > 1 ? <Text style={styles.location}>{item.availableQuantity} de {item.quantity} piezas disponibles</Text> : null}
+            {readOnly ? null : <>
+              <View style={styles.actions}>
+                <AppButton grow label="Ver" icon="eye-outline" onPress={() => onOpen(item.id)} />
+                <AppButton grow tone="secondary" label="Editar" icon="pencil-outline" onPress={() => onEdit(item.id)} />
+              </View>
+              <View style={styles.actions}>
+                <AppButton grow tone="secondary" label="Mover" icon="swap-horizontal" disabled={item.status !== "active"} onPress={() => onMove(item.id)} />
+                <AppButton grow tone="secondary" label="Imprimir" icon="printer-outline" onPress={() => onPrint(item.id)} />
+                {item.status === "active" ? <AppButton grow tone="danger" label="Vender" icon="hand-coin-outline" onPress={() => onSell(item)} /> : null}
+              </View>
+            </>}
             <Text style={styles.hint}>Deslice de lado para ver más fotos · mantenga presionado para ver solo la imagen</Text>
           </View>
         </>

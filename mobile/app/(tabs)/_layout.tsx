@@ -1,9 +1,11 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs, router } from "expo-router";
 
+import { inventoryService } from "../../src/application/inventory-service";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
+import { ExhibitionPinDialog } from "../../src/ui/components/exhibition-pin-dialog";
 import { useInterfaceSettings } from "../../src/ui/context/interface-settings";
 
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
@@ -24,8 +26,45 @@ function AddButton() {
   );
 }
 
+/**
+ * Exit affordance for Exhibition Mode. Long press only, so a customer tapping around the
+ * screen cannot reach the PIN prompt by accident.
+ */
+function ExhibitionExitButton() {
+  const { disableExhibition, recoverExhibition } = useInterfaceSettings();
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [canRecover, setCanRecover] = useState(false);
+
+  useEffect(() => { void inventoryService.canRecoverExhibitionMode().then(setCanRecover).catch(() => setCanRecover(false)); }, []);
+
+  const unlock = async (pin: string) => {
+    setBusy(true);
+    try { await disableExhibition(pin); setAsking(false); }
+    finally { setBusy(false); }
+  };
+  const recover = async () => {
+    setBusy(true);
+    try { await recoverExhibition(); setAsking(false); }
+    finally { setBusy(false); }
+  };
+  return <>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Salir del modo exhibición: mantenga presionado"
+      delayLongPress={700}
+      onLongPress={() => setAsking(true)}
+      style={({ pressed }) => [styles.exitButton, pressed && styles.addPressed]}
+    >
+      <MaterialCommunityIcons name="lock-outline" size={22} color={colors.textMuted} />
+    </Pressable>
+    <ExhibitionPinDialog visible={asking} mode="unlock" busy={busy} onCancel={() => setAsking(false)} onSubmit={unlock} onRecover={canRecover ? recover : undefined} />
+  </>;
+}
+
 export default function TabLayout() {
-  const { largeInterface, textBoost } = useInterfaceSettings();
+  const { largeInterface, textBoost, exhibitionMode } = useInterfaceSettings();
+  const hidden = exhibitionMode ? { href: null as null } : {};
   return (
     <Tabs
       backBehavior="history"
@@ -33,19 +72,20 @@ export default function TabLayout() {
         headerStyle: { backgroundColor: colors.surface },
         headerTitleStyle: { color: colors.textPrimary, fontWeight: "800" },
         headerShadowVisible: false,
-        headerLeft: () => <AddButton />,
+        headerLeft: exhibitionMode ? undefined : () => <AddButton />,
+        headerRight: exhibitionMode ? () => <ExhibitionExitButton /> : undefined,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: [styles.tabBar, largeInterface && styles.tabBarLarge],
+        tabBarStyle: exhibitionMode ? styles.tabBarHidden : [styles.tabBar, largeInterface && styles.tabBarLarge],
         tabBarLabelStyle: [styles.tabLabel, { fontSize: typography.tiny + textBoost }],
         tabBarHideOnKeyboard: true,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: "Inicio", tabBarIcon: ({ color }) => <TabIcon name="home-variant-outline" color={color} /> }} />
+      <Tabs.Screen name="index" options={{ title: "Inicio", tabBarIcon: ({ color }) => <TabIcon name="home-variant-outline" color={color} />, ...hidden }} />
       <Tabs.Screen name="catalog" options={{ title: "Catálogo", tabBarIcon: ({ color }) => <TabIcon name="view-grid-outline" color={color} /> }} />
-      <Tabs.Screen name="scan" options={{ title: "Escanear", tabBarIcon: ({ color }) => <TabIcon name="qrcode-scan" color={color} scan /> }} />
-      <Tabs.Screen name="locations" options={{ title: "Ubicaciones", tabBarIcon: ({ color }) => <TabIcon name="package-variant-closed" color={color} /> }} />
-      <Tabs.Screen name="more" options={{ title: "Más", tabBarIcon: ({ color }) => <TabIcon name="dots-horizontal-circle-outline" color={color} /> }} />
+      <Tabs.Screen name="scan" options={{ title: "Escanear", tabBarIcon: ({ color }) => <TabIcon name="qrcode-scan" color={color} scan />, ...hidden }} />
+      <Tabs.Screen name="locations" options={{ title: "Ubicaciones", tabBarIcon: ({ color }) => <TabIcon name="package-variant-closed" color={color} />, ...hidden }} />
+      <Tabs.Screen name="more" options={{ title: "Más", tabBarIcon: ({ color }) => <TabIcon name="dots-horizontal-circle-outline" color={color} />, ...hidden }} />
     </Tabs>
   );
 }
@@ -53,9 +93,11 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: { backgroundColor: colors.surface, borderTopColor: colors.border, minHeight: 64, paddingTop: spacing.xs },
   tabBarLarge: { minHeight: 74, paddingTop: spacing.sm },
+  tabBarHidden: { display: "none" },
   tabLabel: { fontSize: typography.tiny, fontWeight: "700" },
   tabIcon: { minWidth: 32, minHeight: 32, alignItems: "center", justifyContent: "center" },
   scanIcon: { width: 52, height: 52, marginTop: -18, alignItems: "center", justifyContent: "center", borderRadius: radius.pill, backgroundColor: colors.primary, borderWidth: 3, borderColor: colors.primarySoft },
   addButton: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center", paddingLeft: spacing.md },
+  exitButton: { minWidth: 48, minHeight: 48, alignItems: "center", justifyContent: "center", paddingRight: spacing.md },
   addPressed: { opacity: 0.55 },
 });

@@ -7,6 +7,12 @@ import { ITEM_SELECT, mapItem, mapPhoto, type Row } from "./mappers";
 
 const PAGE_SIZE = 30;
 
+function assertPieces(value: number | undefined): number {
+  const quantity = value ?? 1;
+  if (!Number.isInteger(quantity) || quantity < 1) throw new DomainError("La cantidad de piezas debe ser un número entero de al menos 1.", "invalid_quantity");
+  return quantity;
+}
+
 async function photosForItems(database: DatabaseClient, itemIds: number[]): Promise<Map<number, ReturnType<typeof mapPhoto>[]>> {
   const result = new Map<number, ReturnType<typeof mapPhoto>[]>();
   if (itemIds.length === 0) return result;
@@ -117,9 +123,9 @@ export class ItemRepository {
       const placeholder = `PENDING-ITEM-${Date.now()}`;
       const result = await transaction.runAsync(
         `INSERT INTO items
-          (code, qr_value, container_id, status, price, description, tags_json, sold_at, created_at, updated_at, current_location_id, last_location_id, sync_status)
-         VALUES (?, ?, ?, 'active', ?, ?, ?, NULL, ?, ?, ?, ?, 'pending')`,
-        placeholder, placeholder, locationId, normalizeMoney(input.price), input.description.trim(), JSON.stringify(input.tags), now, now, locationId, locationId,
+          (code, qr_value, container_id, status, price, description, tags_json, quantity, sold_at, created_at, updated_at, current_location_id, last_location_id, sync_status)
+         VALUES (?, ?, ?, 'active', ?, ?, ?, ?, NULL, ?, ?, ?, ?, 'pending')`,
+        placeholder, placeholder, locationId, normalizeMoney(input.price), input.description.trim(), JSON.stringify(input.tags), assertPieces(input.quantity), now, now, locationId, locationId,
       );
       itemId = Number(result.lastInsertRowId);
       const stableId = stableItemCode(itemId);
@@ -147,6 +153,14 @@ export class ItemRepository {
         await transaction.runAsync("DELETE FROM code_registry WHERE entity_type = 'item' AND entity_id = ? AND kind = 'display'", id);
         await transaction.runAsync("INSERT INTO code_registry(value, entity_type, entity_id, kind) VALUES (?, 'item', ?, 'display')", code, id);
         fields.push("code = ?"); values.push(code);
+      }
+      if (input.quantity !== undefined) {
+        const quantity = assertPieces(input.quantity);
+        if (quantity < current.soldQuantity) {
+          throw new DomainError(`La prenda ya tiene ${current.soldQuantity} ${current.soldQuantity === 1 ? "pieza vendida" : "piezas vendidas"}. Restaure ventas antes de reducir la cantidad.`, "quantity_below_sold");
+        }
+        fields.push("quantity = ?", "status = CASE WHEN status = 'archived' THEN 'archived' WHEN ? > sold_quantity THEN 'active' ELSE 'sold' END");
+        values.push(quantity, quantity);
       }
       if (input.price !== undefined) { fields.push("price = ?"); values.push(normalizeMoney(input.price)); }
       if (input.description !== undefined) { fields.push("description = ?"); values.push(input.description.trim()); }
@@ -183,10 +197,10 @@ export class ItemRepository {
     const database = await getDatabase();
     const row = await database.getFirstAsync<Record<string, number>>(`
       SELECT
-        SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS active_count,
-        SUM(CASE WHEN status = 'sold' THEN 1 ELSE 0 END) AS sold_count,
-        SUM(CASE WHEN status = 'active' THEN CAST(price AS REAL) ELSE 0 END) AS active_value,
-        SUM(CASE WHEN status = 'sold' THEN CAST(COALESCE(sold_price, price) AS REAL) ELSE 0 END) AS sold_value,
+        SUM(CASE WHEN status <> 'archived' THEN quantity - sold_quantity ELSE 0 END) AS active_count,
+        SUM(CASE WHEN status <> 'archived' THEN sold_quantity ELSE 0 END) AS sold_count,
+        SUM(CASE WHEN status <> 'archived' THEN (quantity - sold_quantity) * CAST(price AS REAL) ELSE 0 END) AS active_value,
+        SUM(CASE WHEN status <> 'archived' THEN sold_quantity * CAST(COALESCE(sold_price, price) AS REAL) ELSE 0 END) AS sold_value,
         SUM(CASE WHEN status = 'active' AND (current_location_id IS NULL OR current_location_id = -1) THEN 1 ELSE 0 END) AS unassigned_count,
         SUM(CASE WHEN status = 'active' AND NOT EXISTS (SELECT 1 FROM item_photos p WHERE p.item_id = items.id) THEN 1 ELSE 0 END) AS without_photo_count
       FROM items

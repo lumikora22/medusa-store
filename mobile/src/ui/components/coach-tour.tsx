@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { inventoryService } from "../../application/inventory-service";
@@ -10,6 +11,21 @@ import { useInterfaceSettings } from "../context/interface-settings";
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 type Rect = { x: number; y: number; w: number; h: number };
 type Step = { rect: Rect; place: "above" | "below"; icon: IconName; title: string; body: string };
+
+const DIM_COLOR = "rgba(13,27,42,0.84)";
+
+/**
+ * Full-screen dim with a rounded hole punched out of it, as a single even-odd path:
+ * the outer rectangle is filled and the inner rounded rectangle cancels it out. Tiling
+ * four plain rectangles around the target would leave square corners showing behind the
+ * rounded highlight border.
+ */
+function dimPath(width: number, height: number, rect: Rect, cornerRadius: number): string {
+  const r = Math.max(0, Math.min(cornerRadius, rect.w / 2, rect.h / 2));
+  const { x, y, w, h } = rect;
+  const hole = `M${x + r},${y} H${x + w - r} A${r},${r} 0 0 1 ${x + w},${y + r} V${y + h - r} A${r},${r} 0 0 1 ${x + w - r},${y + h} H${x + r} A${r},${r} 0 0 1 ${x},${y + h - r} V${y + r} A${r},${r} 0 0 1 ${x + r},${y} Z`;
+  return `M0,0 H${width} V${height} H0 Z ${hole}`;
+}
 
 /**
  * First-run coach tour: dims the whole screen except one target region and
@@ -23,7 +39,7 @@ export function CoachTour() {
   const [stepIndex, setStepIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
 
-  if (!settings || settings.tutorialSeen || dismissed) return null;
+  if (!settings || settings.tutorialSeen || settings.exhibitionMode || dismissed) return null;
 
   const tabBarHeight = 64 + insets.bottom;
   const tabTop = height - tabBarHeight;
@@ -45,10 +61,10 @@ export function CoachTour() {
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <Pressable style={[styles.dim, { left: 0, top: 0, width, height: rect.y }]} onPress={next} />
-      <Pressable style={[styles.dim, { left: 0, top: rect.y + rect.h, width, height: Math.max(0, height - rect.y - rect.h) }]} onPress={next} />
-      <Pressable style={[styles.dim, { left: 0, top: rect.y, width: rect.x, height: rect.h }]} onPress={next} />
-      <Pressable style={[styles.dim, { left: rect.x + rect.w, top: rect.y, width: Math.max(0, width - rect.x - rect.w), height: rect.h }]} onPress={next} />
+      <Pressable accessibilityLabel="Continuar tutorial" onPress={next} style={StyleSheet.absoluteFill} />
+      <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Path d={dimPath(width, height, rect, radius.md)} fill={DIM_COLOR} fillRule="evenodd" />
+      </Svg>
       <Pressable accessibilityRole="button" accessibilityLabel={`${step.title}: continuar`} onPress={next} style={[styles.highlight, { left: rect.x, top: rect.y, width: rect.w, height: rect.h }]} />
       <View style={[styles.tooltip, step.place === "below" ? { top: rect.y + rect.h + 14 } : { bottom: Math.max(0, height - rect.y) + 14 }]}>
         <View style={styles.tipHead}><View style={styles.tipIcon}><MaterialCommunityIcons name={step.icon} size={22} color={colors.primary} /></View><Text style={styles.tipTitle}>{step.title}</Text></View>
@@ -66,7 +82,6 @@ export function CoachTour() {
 }
 
 const styles = StyleSheet.create({
-  dim: { position: "absolute", backgroundColor: "rgba(13,27,42,0.84)" },
   highlight: { position: "absolute", borderRadius: radius.md, borderCurve: "continuous", borderWidth: 2, borderColor: colors.primarySoft },
   tooltip: { position: "absolute", left: spacing.lg, right: spacing.lg, gap: spacing.sm, padding: spacing.lg, borderRadius: radius.xl, borderCurve: "continuous", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   tipHead: { flexDirection: "row", alignItems: "center", gap: spacing.sm },

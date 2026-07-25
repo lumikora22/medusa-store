@@ -70,6 +70,32 @@ describe("staged backup restore", () => {
     assert.equal((await items.getById(item.id)).description, "Current state before restore"); assert.equal(files.live.get("live://photo.jpg"), "CURRENT-BYTES"); assert.equal(files.stages.size, 0); assert.equal(files.staged.size, 0);
   });
 
+  it("restores a pre-v4 backup and rebuilds piece counters from item status", async () => {
+    const { item } = await seed();
+    const service = new BackupService(repository, files, platform);
+    await service.create(false);
+
+    // Rebuild the package as schema 3 produced it: no item_sales, no piece columns, one sold item.
+    const backup = latestPackage();
+    const legacyTables = { ...backup.tables } as Record<string, Array<Record<string, unknown>>>;
+    delete legacyTables.item_sales;
+    legacyTables.items = legacyTables.items.map((row) => {
+      const copy = { ...row }; delete copy.quantity; delete copy.sold_quantity;
+      return { ...copy, status: "sold", sold_price: "42.00", sold_at: "2025-06-01T00:00:00.000Z" };
+    });
+    const legacy = { format: backup.format, version: backup.version, schemaVersion: 3, createdAt: backup.createdAt, tables: legacyTables, photos: backup.photos };
+    const legacyPackage = { ...legacy, checksum: await platform.digest(JSON.stringify(legacy)) } as unknown as BackupPackage;
+
+    await service.restore(legacyPackage);
+
+    const restored = await items.getById(item.id);
+    assert.equal(restored.quantity, 1);
+    assert.equal(restored.soldQuantity, 1, "a sold legacy item must come back with its piece counted as sold");
+    assert.equal(restored.availableQuantity, 0);
+    const sales = await database.getAllAsync<Record<string, unknown>>("SELECT item_id, quantity, restored_quantity, sold_price FROM item_sales");
+    assert.deepEqual(sales, [{ item_id: item.id, quantity: 1, restored_quantity: 0, sold_price: "42.00" }]);
+  });
+
   it("rejects a modified package before creating a stage", async () => {
     await seed(); const service = new BackupService(repository, files, platform); await service.create(false); const backup = latestPackage(); backup.photos[0].contentBase64 = "TAMPERED";
     await assert.rejects(service.restore(backup), /modificado/); assert.equal(files.stages.size, 0); assert.equal(files.live.get("live://photo.jpg"), "ORIGINAL-BYTES");

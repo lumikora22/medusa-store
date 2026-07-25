@@ -11,7 +11,7 @@
     "build:web": "expo export -p web",
     "preview:web": "serve -s dist -l 4174",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/domain/codes.test.ts src/core/labels/code128.test.ts src/core/scanner/duplicate-lock.test.ts src/data/sqlite/migrations.test.ts src/data/repositories/repositories.test.ts src/core/backup/backup-service.test.ts src/config/hosting.test.ts"
+    "test": "tsx --test src/domain/codes.test.ts src/core/labels/code128.test.ts src/core/scanner/duplicate-lock.test.ts src/core/security/exhibition-lock.test.ts src/data/sqlite/migrations.test.ts src/data/repositories/repositories.test.ts src/core/backup/backup-service.test.ts src/config/hosting.test.ts"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
@@ -31,6 +31,7 @@
     "expo-image-picker": "~17.0.11",
     "expo-linear-gradient": "~15.0.8",
     "expo-linking": "~8.0.12",
+    "expo-local-authentication": "~17.0.8",
     "expo-print": "~15.0.8",
     "expo-router": "~6.0.24",
     "expo-sharing": "~14.0.8",

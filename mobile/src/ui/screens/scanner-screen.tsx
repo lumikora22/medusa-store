@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAudioPlayer } from "expo-audio";
 import { type BarcodeScanningResult, CameraView, useCameraPermissions } from "expo-camera";
@@ -13,6 +13,7 @@ import type { ScanResolution } from "../../domain/models";
 import { colors, inputStyle, radius, spacing, typography } from "../../theme/tokens";
 import { formatMoney, itemStatusLabel } from "../../utils/format";
 import { AppButton } from "../components/app-button";
+import { KeyboardAwareScreen } from "../components/keyboard-aware-screen";
 import { StatusChip } from "../components/status-chip";
 import { useDialog } from "../context/dialog";
 import { useInterfaceSettings } from "../context/interface-settings";
@@ -36,13 +37,13 @@ export function ScannerScreen() {
     catch (error) { await feedback(Haptics.NotificationFeedbackType.Error); void alert({ title: "No pudimos leer el código", message: error instanceof Error ? error.message : "Intente nuevamente.", tone: "danger" }); }
     finally { setBusy(false); }
   };
-  return <ScrollView contentInsetAdjustmentBehavior="automatic" keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+  return <KeyboardAwareScreen contentContainerStyle={styles.content}>
     <View style={styles.heading}><Text style={styles.title}>Escáner universal</Text><Pressable accessibilityRole="button" accessibilityLabel={torch ? "Apagar luz" : "Encender luz"} onPress={() => setTorch((value) => !value)} style={styles.torch}><MaterialCommunityIcons name={torch ? "flashlight-off" : "flashlight"} size={24} color={colors.primary} /><Text style={styles.torchText}>{torch ? "Apagar" : "Luz"}</Text></Pressable></View>
     <Text style={styles.intro}>Lea el código de una prenda o ubicación. También puede escribirlo manualmente.</Text>
     {!permission ? <View style={styles.cameraPlaceholder}><Text style={styles.note}>Consultando permiso de cámara...</Text></View> : permission.granted ? <View style={styles.cameraFrame}><CameraView style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} onBarcodeScanned={busy ? undefined : ({ data }: BarcodeScanningResult) => void resolve(data)} barcodeScannerSettings={{ barcodeTypes: ["qr", "code128", "code39", "ean13"] }} /><View pointerEvents="none" style={styles.guide}><View style={styles.guideBox} /><Text style={styles.guideText}>{busy ? "Buscando..." : "Centre el código"}</Text></View></View> : <View style={styles.permission}><MaterialCommunityIcons name="camera-off-outline" size={36} color={colors.primary} /><Text style={styles.note}>La cámara necesita permiso para escanear.</Text><AppButton label="Permitir cámara" icon="camera-outline" onPress={() => void requestPermission()} /></View>}
-    <View style={styles.manual}><TextInput accessibilityLabel="Código manual" value={manualCode} onChangeText={setManualCode} autoCapitalize="characters" autoCorrect={false} placeholder="MSI-000123 o LOC-RACK-004" placeholderTextColor={colors.textMuted} style={styles.input} onSubmitEditing={() => void resolve(manualCode)} /><AppButton label="Buscar" icon="magnify" onPress={() => void resolve(manualCode)} disabled={!manualCode.trim() || busy} /></View>
+    <View style={styles.manual}><TextInput accessibilityLabel="Código manual" value={manualCode} onChangeText={setManualCode} autoCapitalize="characters" autoCorrect={false} placeholder="Código manual" placeholderTextColor={colors.textMuted} maxFontSizeMultiplier={1.4} style={styles.input} onSubmitEditing={() => void resolve(manualCode)} /><AppButton label="Buscar" icon="magnify" onPress={() => void resolve(manualCode)} disabled={!manualCode.trim() || busy} /></View>
     {resolution ? <ResultCard resolution={resolution} onChange={setResolution} onClear={() => { setResolution(null); lock.current.clear(); }} /> : <View style={styles.help}><Text style={styles.helpTitle}>Códigos compatibles</Text><Text style={styles.note}>QR, Code 128, Code 39 y EAN-13. La confirmación siempre es visual y háptica; el sonido depende del ajuste y soporte de la plataforma.</Text></View>}
-  </ScrollView>;
+  </KeyboardAwareScreen>;
 }
 
 function ResultCard({ resolution, onChange, onClear }: { resolution: ScanResolution; onChange: (value: ScanResolution) => void; onClear: () => void }) {

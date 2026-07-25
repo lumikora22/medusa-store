@@ -39,6 +39,12 @@
       "expo-audio",
       "expo-asset",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Permite salir del modo exhibición confirmando su identidad."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#F4EBDD",
