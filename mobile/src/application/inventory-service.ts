@@ -91,6 +91,8 @@ export class InventoryService {
   restoreSale(itemId: number, reason: string, quantity?: number) { return this.sales.restore(itemId, reason, quantity); }
   restoreSales(itemIds: number[], reason: string, quantity?: number) { return this.sales.restoreMany(itemIds, reason, quantity); }
   itemSales(itemId: number) { return this.sales.salesOf(itemId); }
+  unarchiveItem(itemId: number) { return this.items.unarchive(itemId); }
+  removeLocation(locationId: number) { return this.locations.remove(locationId); }
 
   async resolveCode(code: string) {
     const owner = await this.codes.resolve(code);

@@ -104,7 +104,7 @@ export function CatalogScreen({ initialFilter }: CatalogScreenProps = {}) {
     <View style={styles.toolbar}><Searchbar accessibilityLabel="Buscar prendas" value={search} onChangeText={setSearch} placeholder="Buscar prendas" maxFontSizeMultiplier={1.4} style={styles.search} /><Pressable accessibilityRole="button" accessibilityLabel="Vista rápida a pantalla completa" onPress={openQuickView} style={({ pressed }) => [styles.quickButton, pressed && styles.pressed]}><MaterialCommunityIcons name="cellphone" size={20} color={colors.onPrimary} /></Pressable></View>
     <View style={styles.filterBand}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        {(["active", "sold", "all"] as const).map((status) => <FilterChip key={status} label={status === "active" ? "Disponibles" : status === "sold" ? "Vendidas" : "Todas"} selected={filters.status === status} onPress={() => setFilters((current) => ({ ...current, status }))} />)}
+        {(["active", "sold", "archived", "all"] as const).map((status) => <FilterChip key={status} label={status === "active" ? "Disponibles" : status === "sold" ? "Vendidas" : status === "archived" ? "Archivadas" : "Todas"} selected={filters.status === status} onPress={() => setFilters((current) => ({ ...current, status }))} />)}
         <FilterChip label="Sin asignar" selected={filters.unassignedOnly} onPress={() => setFilters((current) => ({ ...current, unassignedOnly: !current.unassignedOnly }))} />
         <FilterChip label="Sin foto" selected={filters.photo === "without"} onPress={() => setFilters((current) => ({ ...current, photo: current.photo === "without" ? "all" : "without" }))} />
       </ScrollView>

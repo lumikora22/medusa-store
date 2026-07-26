@@ -99,6 +99,53 @@ export class LocationRepository {
     return this.getById(id);
   }
 
+  /**
+   * Removes a container the user no longer wants.
+   *
+   * A container still holding pieces is refused outright: emptying it is the user's call,
+   * never a silent side effect. Once empty, the row is only really deleted when nothing
+   * else points at it. Transfers, counts and past garments keep foreign keys into
+   * `locations`, so anything with history is archived instead — it disappears from the
+   * lists either way, but the record behind old events survives.
+   */
+  async remove(id: number): Promise<"deleted" | "archived"> {
+    if (id < 0) throw new DomainError("La ubicación del sistema no se puede eliminar.", "system_location");
+    const database = await getDatabase();
+    const location = await this.getById(id);
+    const now = new Date().toISOString();
+    let outcome: "deleted" | "archived" = "deleted";
+
+    await inTransaction(database, async (transaction) => {
+      const held = await transaction.getFirstAsync<{ total: number }>(
+        "SELECT COUNT(*) AS total FROM items WHERE current_location_id = ? AND status = 'active' AND quantity - sold_quantity > 0", id,
+      );
+      if (Number(held?.total ?? 0) > 0) {
+        throw new DomainError(`${location.name} todavía tiene prendas. Muévalas o véndalas antes de eliminar el contenedor.`, "location_not_empty");
+      }
+      const referenced = await transaction.getFirstAsync<{ total: number }>(
+        `SELECT
+           (SELECT COUNT(*) FROM items WHERE current_location_id = ? OR last_location_id = ? OR container_id = ?) +
+           (SELECT COUNT(*) FROM transfer_batches WHERE destination_location_id = ?) +
+           (SELECT COUNT(*) FROM physical_counts WHERE location_id = ?) AS total`,
+        id, id, id, id, id,
+      );
+      outcome = Number(referenced?.total ?? 0) > 0 ? "archived" : "deleted";
+
+      if (outcome === "archived") {
+        await transaction.runAsync("UPDATE locations SET status = 'archived', updated_at = ?, sync_status = 'pending' WHERE id = ?", now, id);
+      } else {
+        await transaction.runAsync("DELETE FROM code_registry WHERE entity_type = 'location' AND entity_id = ?", id);
+        await transaction.runAsync("DELETE FROM locations WHERE id = ?", id);
+        await transaction.runAsync("DELETE FROM containers WHERE id = ?", id);
+      }
+      await insertEvent(transaction, {
+        stableId: `EVENT-LOCATION-${id}-REMOVED`, type: "location_removed", locationId: outcome === "archived" ? id : null,
+        summary: `Ubicación ${location.code} eliminada`, payload: { name: location.name, code: location.code, outcome }, createdAt: now,
+      });
+    });
+    return outcome;
+  }
+
   async touch(id: number): Promise<void> {
     const database = await getDatabase();
     await database.runAsync("UPDATE locations SET last_used_at = ? WHERE id = ?", new Date().toISOString(), id);

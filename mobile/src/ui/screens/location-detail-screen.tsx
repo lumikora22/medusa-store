@@ -24,7 +24,7 @@ type DetailData = { location: LocationSummary; items: Item[] };
 export function LocationDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const locationId = Number(id);
-  const { alert } = useDialog();
+  const { alert, confirm } = useDialog();
   const [search, setSearch] = useState(""); const deferred = useDeferredValue(search); const [showCodes, setShowCodes] = useState(false); const [selected, setSelected] = useState<Set<number>>(new Set()); const [editing, setEditing] = useState(false); const [view, setView] = useState<"grid" | "list">("list"); const [menuOpen, setMenuOpen] = useState(false);
   const loader = useCallback(async (): Promise<DetailData> => ({ location: await inventoryService.getLocation(locationId), items: await inventoryService.locationItems(locationId, deferred) }), [deferred, locationId]);
   const { data, loading, error, refresh } = useFocusLoad(loader);
@@ -36,6 +36,16 @@ export function LocationDetailScreen() {
   const toggle = (itemId: number) => setSelected((current) => { const next = new Set(current); next.has(itemId) ? next.delete(itemId) : next.add(itemId); return next; });
   const startCount = async () => { try { const count = await inventoryService.startPhysicalCount(location.id); router.push({ pathname: "/counts/[id]", params: { id: String(count.id) } }); } catch (error) { void alert({ title: "No pudimos iniciar el conteo", message: error instanceof Error ? error.message : "Intente nuevamente.", tone: "danger" }); } };
   const openQuickView = () => router.push({ pathname: "/quick", params: { status: "active", locationId: String(location.id) } });
+  const removeLocation = async () => {
+    if (!(await confirm({ title: "Eliminar contenedor", message: `${location.name} dejará de aparecer en la aplicación. Si participó en traslados o conteos se conservará oculto para no romper el historial.`, confirmLabel: "Eliminar", tone: "danger", icon: "delete-outline" }))) return;
+    try {
+      const outcome = await inventoryService.removeLocation(location.id);
+      router.replace("/locations");
+      void alert({ title: "Contenedor eliminado", message: outcome === "archived" ? "Se conservó oculto porque tiene historial asociado." : "Se eliminó por completo.", icon: "check-circle-outline" });
+    } catch (reason) {
+      void alert({ title: "No pudimos eliminarlo", message: reason instanceof Error ? reason.message : "Intente nuevamente.", tone: "danger" });
+    }
+  };
   return <View style={styles.root}><FlatList key={view} data={items} numColumns={view === "grid" ? 2 : 1} columnWrapperStyle={view === "grid" ? styles.row : undefined} keyExtractor={(item) => String(item.id)} renderItem={({ item }) => <ItemCard item={item} mode={view} selected={selected.has(item.id)} selectionMode={selected.size > 0} onToggle={toggle} onPress={(itemId) => router.push({ pathname: "/items/[id]", params: { id: String(itemId) } })} />} contentInsetAdjustmentBehavior="automatic" contentContainerStyle={[styles.content, { paddingBottom: 140 + insets.bottom }]} ListHeaderComponent={<View style={styles.header}>
     <View style={styles.infoCard}>
       <View style={styles.infoTop}>
@@ -54,6 +64,7 @@ export function LocationDetailScreen() {
         <Menu.Item leadingIcon="qrcode" title={showCodes ? "Ocultar códigos" : "Ver códigos"} onPress={() => { setMenuOpen(false); setShowCodes((value) => !value); }} />
         <Menu.Item leadingIcon="printer-outline" title="Etiquetas del contenido" disabled={items.length === 0} onPress={() => { setMenuOpen(false); router.push({ pathname: "/labels", params: { itemIds: items.map((current) => current.id).join(",") } }); }} />
         <Menu.Item leadingIcon="tag-outline" title="Etiqueta de la ubicación" onPress={() => { setMenuOpen(false); router.push({ pathname: "/labels", params: { locationIds: String(location.id) } }); }} />
+        <Menu.Item leadingIcon="delete-outline" title="Eliminar contenedor" onPress={() => { setMenuOpen(false); void removeLocation(); }} />
       </Menu>
     </View>
     {editing ? <LocationEditor location={location} onSaved={() => { setEditing(false); void refresh(); }} /> : null}

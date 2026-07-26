@@ -73,6 +73,10 @@ export function ItemDetailScreen() {
     if (!(await confirm({ title: "Archivar prenda", message: "La prenda dejará de aparecer entre las disponibles, pero conservará su historial.", confirmLabel: "Archivar", tone: "danger", icon: "archive-outline" }))) return;
     try { await inventoryService.archiveItem(item.id); await refresh(); } catch (reason) { void alert({ title: "No pudimos archivar", message: reason instanceof Error ? reason.message : "Intente nuevamente.", tone: "danger" }); }
   };
+  const unarchive = async () => {
+    try { await inventoryService.unarchiveItem(item.id); await refresh(); }
+    catch (reason) { void alert({ title: "No pudimos restaurarla", message: reason instanceof Error ? reason.message : "Intente nuevamente.", tone: "danger" }); }
+  };
   const restore = async (quantity?: number) => {
     const pieces = quantity ?? 1;
     const message = item.quantity > 1
@@ -87,6 +91,7 @@ export function ItemDetailScreen() {
     {addingPhoto ? <View style={styles.addingRow}><ActivityIndicator color={colors.primary} /><Text style={styles.muted}>Agregando fotos...</Text></View> : null}
     <View style={styles.hero}><View style={styles.heroTop}><View><Text style={styles.eyebrow}>{item.machineCode}</Text><Text accessibilityRole="header" style={styles.title}>{item.code}</Text></View><StatusChip status={item.status} /></View><Text style={styles.price}>{formatMoney(item.status === "sold" ? item.soldPrice ?? item.price : item.price)}</Text>{item.quantity > 1 ? <Text style={styles.pieces}>{item.availableQuantity} de {item.quantity} piezas disponibles · {item.soldQuantity} vendidas</Text> : null}<Text style={styles.location}>{item.currentLocation?.name ?? "Sin asignar / En transición"}</Text><Text style={styles.description}>{item.description || "Sin descripción"}</Text>{item.tags.length ? <View style={styles.tags}>{item.tags.map((tag) => <View key={tag} style={styles.tag}><Text style={styles.tagText}>{tag}</Text></View>)}</View> : null}</View>
     <View style={styles.actions}>
+      {item.status === "archived" ? <AppButton grow tone="secondary" label="Restaurar del archivo" icon="archive-arrow-up-outline" onPress={() => void unarchive()} /> : null}
       {item.status !== "archived" && item.availableQuantity > 0 ? <AppButton grow tone="danger" label="Vender" icon="hand-coin-outline" onPress={() => setSaleOpen(true)} /> : null}
       {item.soldQuantity > 0 ? <AppButton grow tone="secondary" label={item.quantity > 1 ? "Restaurar última venta" : "Restaurar"} icon="backup-restore" onPress={() => void restore()} /> : null}
       <AppButton grow label="Mover" icon="swap-horizontal" onPress={() => router.push({ pathname: "/transfer", params: { ids: String(item.id) } })} disabled={item.status !== "active" || item.availableQuantity === 0} />

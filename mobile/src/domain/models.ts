@@ -12,6 +12,7 @@ export type EventType =
   | "item_created"
   | "item_updated"
   | "item_archived"
+  | "item_unarchived"
   | "photo_added"
   | "photo_removed"
   | "photos_reordered"
@@ -22,6 +23,7 @@ export type EventType =
   | "sale_restored"
   | "location_created"
   | "location_updated"
+  | "location_removed"
   | "physical_count_started"
   | "physical_count_completed"
   | "physical_count_cancelled";

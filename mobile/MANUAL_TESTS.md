@@ -46,6 +46,16 @@ Complete esta lista en un dispositivo Android y uno iOS antes de distribuir una 
 - [ ] Las piezas ya vendidas no se esperan en el conteo.
 - [ ] Un conteo abierto antes de actualizar la aplicación sigue funcionando y espera una pieza por registro.
 
+## Archivo y contenedores
+
+- [ ] El filtro "Archivadas" del catálogo muestra solo las prendas archivadas.
+- [ ] Una prenda archivada ofrece "Restaurar del archivo" y vuelve al catálogo.
+- [ ] Restaurar una archivada sin piezas disponibles la deja como vendida.
+- [ ] Eliminar un contenedor con prendas se rechaza y pide vaciarlo primero.
+- [ ] Eliminar un contenedor vacío y sin historial lo borra y libera su código.
+- [ ] Eliminar un contenedor con traslados o conteos lo oculta sin romper el historial.
+- [ ] Un contenedor eliminado desaparece de la lista y del selector de contenedor.
+
 ## Etiquetas e impresión
 
 - [ ] La vista previa muestra Code 128 o QR legible según la plantilla elegida.

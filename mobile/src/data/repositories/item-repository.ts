@@ -182,6 +182,22 @@ export class ItemRepository {
     return this.getById(id);
   }
 
+  /** Brings an archived record back; it lands available or sold depending on its pieces. */
+  async unarchive(id: number): Promise<Item> {
+    const database = await getDatabase();
+    const current = await this.getById(id);
+    if (current.status !== "archived") throw new DomainError("La prenda no está archivada.", "item_not_archived");
+    const now = new Date().toISOString();
+    await inTransaction(database, async (transaction) => {
+      await transaction.runAsync(
+        "UPDATE items SET status = CASE WHEN sold_quantity >= quantity THEN 'sold' ELSE 'active' END, updated_at = ?, sync_status = 'pending' WHERE id = ?",
+        now, id,
+      );
+      await insertEvent(transaction, { stableId: `EVENT-ITEM-${id}-UNARCHIVE-${Date.now()}`, type: "item_unarchived", itemId: id, locationId: current.currentLocationId, summary: `Prenda ${current.code} restaurada del archivo`, createdAt: now });
+    });
+    return this.getById(id);
+  }
+
   async archive(id: number): Promise<Item> {
     const database = await getDatabase();
     const current = await this.getById(id);

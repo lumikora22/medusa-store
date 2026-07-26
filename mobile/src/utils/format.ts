@@ -35,9 +35,9 @@ export function itemStatusLabel(status: ItemStatus): string {
 
 export function eventTypeLabel(type: EventType): string {
   const labels: Record<EventType, string> = {
-    item_created: "Creación", item_updated: "Edición", item_archived: "Archivo", photo_added: "Foto agregada", photo_removed: "Foto eliminada",
+    item_created: "Creación", item_updated: "Edición", item_archived: "Archivo", item_unarchived: "Restaurada del archivo", photo_added: "Foto agregada", photo_removed: "Foto eliminada",
     photos_reordered: "Fotos ordenadas", item_moved: "Movimiento", batch_moved: "Traslado", batch_undone: "Traslado deshecho", item_sold: "Venta",
-    sale_restored: "Venta restaurada", location_created: "Ubicación creada", location_updated: "Ubicación editada",
+    sale_restored: "Venta restaurada", location_created: "Ubicación creada", location_updated: "Ubicación editada", location_removed: "Ubicación eliminada",
     physical_count_started: "Conteo iniciado", physical_count_completed: "Conteo finalizado", physical_count_cancelled: "Conteo cancelado",
   };
   return labels[type];

@@ -210,6 +210,42 @@ describe("inventory repositories", () => {
     assert.equal(location.totalValue, "30.00");
   });
 
+  it("refuses to delete a container that still holds pieces", async () => {
+    const rack = await createLocation("RACK-FULL"); await createItem("FULL-A", rack.id);
+    await assert.rejects(locations.remove(rack.id), /todavía tiene prendas/);
+    assert.equal((await locations.getById(rack.id)).status, "active", "a refused delete must leave the container untouched");
+    await assert.rejects(locations.remove(-1), /del sistema no se puede eliminar/);
+  });
+
+  it("deletes an unused empty container and archives one with history", async () => {
+    const unused = await createLocation("RACK-UNUSED");
+    assert.equal(await locations.remove(unused.id), "deleted");
+    await assert.rejects(locations.getById(unused.id), /No encontramos la ubicación/);
+    assert.equal(await new CodeRepository().resolve("RACK-UNUSED"), null, "its code must be freed for reuse");
+
+    const used = await createLocation("RACK-USED"); const item = await createItem("USED-A", used.id);
+    await sales.sell(item.id, {});
+    assert.equal(await locations.remove(used.id), "archived", "a container referenced by past garments survives hidden");
+    assert.equal((await locations.getById(used.id)).status, "archived");
+    assert.equal((await locations.list()).some((location) => location.id === used.id), false, "archived containers leave the list");
+  });
+
+  it("restores an archived item to available or sold depending on its pieces", async () => {
+    const rack = await createLocation("RACK-ARCHIVE"); const item = await createItem("ARCH-A", rack.id);
+    await database.runAsync("UPDATE items SET quantity = 2 WHERE id = ?", item.id);
+    await sales.sell(item.id, { quantity: 1 });
+    await items.archive(item.id);
+    assert.equal((await items.getById(item.id)).status, "archived");
+
+    const restored = await items.unarchive(item.id);
+    assert.equal(restored.status, "active", "one piece is still available so it returns to the catalog");
+    await assert.rejects(items.unarchive(item.id), /no está archivada/);
+
+    await sales.sell(item.id, { quantity: 1 });
+    await items.archive(item.id);
+    assert.equal((await items.unarchive(item.id)).status, "sold", "with no pieces left it returns as sold");
+  });
+
   it("computes and persists backup reminder settings", async () => {
     const settings = new SettingsRepository(); assert.equal((await settings.get()).backupDue, true);
     await settings.set("backupReminderDays", 14); await database.runAsync("INSERT INTO backup_history(stable_id, file_uri, checksum, item_count, location_count, photo_count, status, created_at) VALUES ('BACKUP-TEST', 'memory://backup', 'hash', 0, 0, 0, 'created', ?)", new Date().toISOString());
