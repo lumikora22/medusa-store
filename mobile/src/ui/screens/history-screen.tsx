@@ -43,7 +43,7 @@ export function HistoryScreen() {
     {pickerFor ? (process.env.EXPO_OS === "ios" ? (
       <Modal transparent animationType="slide" onRequestClose={() => setPickerFor(null)}>
         <Pressable style={styles.pickerBackdrop} onPress={() => setPickerFor(null)}>
-          <Pressable style={styles.pickerSheet} onPress={() => undefined}>
+          <Pressable style={[styles.pickerSheet, { paddingBottom: spacing.lg + insets.bottom }]} onPress={() => undefined}>
             <DateTimePicker value={currentDate ? new Date(`${currentDate}T12:00:00`) : new Date()} mode="date" display="spinner" themeVariant="light" textColor={colors.textPrimary} accentColor={colors.primary} onChange={onDateChange} />
             <AppButton label="Listo" icon="check" onPress={() => setPickerFor(null)} />
           </Pressable>

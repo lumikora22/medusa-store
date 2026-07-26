@@ -126,7 +126,7 @@ export function CatalogScreen({ initialFilter }: CatalogScreenProps = {}) {
     {selected.size > 0 && !exhibitionMode ? <View style={[styles.selection, { bottom: spacing.sm + insets.bottom }]}><Text style={styles.selectionText}>{selected.size} seleccionadas</Text><AppButton label="Mover" icon="swap-horizontal" onPress={() => router.push({ pathname: "/transfer", params: { ids: selectedIds.join(",") } })} /><AppButton tone="secondary" label="Etiquetas" icon="printer-outline" onPress={() => router.push({ pathname: "/labels", params: { itemIds: selectedIds.join(",") } })} /><AppButton tone="danger" label="Vender" icon="hand-coin-outline" onPress={() => void sellSelected()} /><Pressable accessibilityRole="button" accessibilityLabel="Cancelar selección" onPress={() => setSelected(new Set())} style={styles.close}><MaterialCommunityIcons name="close" size={24} color={colors.primary} /></Pressable></View> : null}
     <Modal visible={containerOpen} transparent animationType="slide" onRequestClose={() => setContainerOpen(false)}>
       <Pressable style={styles.pickerBackdrop} onPress={() => setContainerOpen(false)}>
-        <Pressable style={styles.picker} onPress={() => undefined}>
+        <Pressable style={[styles.picker, { paddingBottom: spacing.lg + insets.bottom }]} onPress={() => undefined}>
           <Text style={styles.pickerTitle}>Filtrar por contenedor</Text>
           <Searchbar accessibilityLabel="Buscar contenedor" value={containerSearch} onChangeText={setContainerSearch} placeholder="Nombre, código o tipo" style={styles.pickerSearch} />
           <FlatList

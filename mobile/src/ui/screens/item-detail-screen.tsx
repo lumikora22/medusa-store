@@ -11,6 +11,8 @@ import QRCode from "react-native-qrcode-svg";
 import { inventoryService } from "../../application/inventory-service";
 import { parseTags } from "../../domain/codes";
 import type { InventoryEvent, Item, ItemPhoto, LocationSummary, PhotoAsset } from "../../domain/models";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 import { colors, inputStyle, radius, spacing, typography } from "../../theme/tokens";
 import { eventTypeLabel, formatDate, formatMoney } from "../../utils/format";
 import { AppButton } from "../components/app-button";
@@ -115,7 +117,7 @@ function ItemEditor({ item, locations, onSaved }: { item: Item; locations: Locat
 function PhotoAction({ label, icon, onPress, disabled = false, danger = false }: { label: string; icon: keyof typeof MaterialCommunityIcons.glyphMap; onPress: () => void; disabled?: boolean; danger?: boolean }) { return <Pressable accessibilityRole="button" accessibilityLabel={label} disabled={disabled} onPress={onPress} style={[styles.photoAction, { minWidth: 48, minHeight: 48 }, disabled && styles.disabled]}><MaterialCommunityIcons name={icon} size={20} color={danger ? colors.danger : colors.primary} /></Pressable>; }
 
 function SalePanel({ visible, item, onClose, onSaved }: { visible: boolean; item: Item; onClose: () => void; onSaved: () => void }) {
-  const { alert } = useDialog(); const keyboardHeight = useKeyboardHeight();
+  const { alert } = useDialog(); const keyboardHeight = useKeyboardHeight(); const insets = useSafeAreaInsets();
   const [price, setPrice] = useState(""); const [date, setDate] = useState(new Date().toISOString().slice(0, 10)); const [quantity, setQuantity] = useState(1); const [saving, setSaving] = useState(false);
   useEffect(() => { if (visible) setQuantity(1); }, [visible]);
   const save = async () => {
@@ -125,7 +127,7 @@ function SalePanel({ visible, item, onClose, onSaved }: { visible: boolean; item
     finally { setSaving(false); }
   };
   const remaining = item.availableQuantity - quantity;
-  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={[styles.modalBackdrop, keyboardHeight > 0 && { paddingBottom: keyboardHeight }]}><View style={styles.modal}>
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}><View style={[styles.modalBackdrop, { paddingBottom: spacing.md + (keyboardHeight > 0 ? keyboardHeight : insets.bottom) }]}><View style={styles.modal}>
     <Text style={styles.modalTitle}>Marcar como vendida</Text>
     <Text style={styles.muted}>El precio real es opcional. La última ubicación y las fotos se conservarán.</Text>
     {item.quantity > 1 ? <><QuantityStepper label="Piezas vendidas" value={quantity} max={item.availableQuantity} onChange={setQuantity} /><Text style={styles.muted}>{remaining > 0 ? `Quedarán ${remaining} ${remaining === 1 ? "pieza disponible" : "piezas disponibles"} en el catálogo.` : "Se venderán todas las piezas disponibles."}</Text></> : null}
