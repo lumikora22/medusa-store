@@ -41,7 +41,7 @@ export function CoachTour() {
 
   if (!settings || settings.tutorialSeen || settings.exhibitionMode || dismissed) return null;
 
-  const tabBarHeight = 64 + insets.bottom;
+  const tabBarHeight = (settings.largeInterface ? 74 : 64) + insets.bottom;
   const tabTop = height - tabBarHeight;
   const slot = width / 5;
   const steps: Step[] = [

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs, router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { inventoryService } from "../../src/application/inventory-service";
 import { colors, radius, spacing, typography } from "../../src/theme/tokens";
@@ -62,9 +63,21 @@ function ExhibitionExitButton() {
   </>;
 }
 
+const TAB_BAR_HEIGHT = 64;
+const TAB_BAR_HEIGHT_LARGE = 74;
+
 export default function TabLayout() {
   const { largeInterface, textBoost, exhibitionMode } = useInterfaceSettings();
+  const insets = useSafeAreaInsets();
   const hidden = exhibitionMode ? { href: null as null } : {};
+  /**
+   * Height and bottom padding are set explicitly instead of relying on the navigator's
+   * own inset maths. A standalone Android build runs edge-to-edge and draws underneath the
+   * three-button navigation bar, and this style is merged last, so whatever it declares
+   * wins. Declaring `height` also makes the navigator reserve the same space for content.
+   */
+  const barHeight = (largeInterface ? TAB_BAR_HEIGHT_LARGE : TAB_BAR_HEIGHT) + insets.bottom;
+  const barSize = { height: barHeight, paddingBottom: insets.bottom };
   return (
     <Tabs
       backBehavior="history"
@@ -76,7 +89,7 @@ export default function TabLayout() {
         headerRight: exhibitionMode ? () => <ExhibitionExitButton /> : undefined,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: exhibitionMode ? styles.tabBarHidden : [styles.tabBar, largeInterface && styles.tabBarLarge],
+        tabBarStyle: exhibitionMode ? styles.tabBarHidden : [styles.tabBar, largeInterface && styles.tabBarLarge, barSize],
         tabBarLabelStyle: [styles.tabLabel, { fontSize: typography.tiny + textBoost }],
         tabBarHideOnKeyboard: true,
       }}
@@ -91,8 +104,8 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBar: { backgroundColor: colors.surface, borderTopColor: colors.border, minHeight: 64, paddingTop: spacing.xs },
-  tabBarLarge: { minHeight: 74, paddingTop: spacing.sm },
+  tabBar: { backgroundColor: colors.surface, borderTopColor: colors.border, paddingTop: spacing.xs },
+  tabBarLarge: { paddingTop: spacing.sm },
   tabBarHidden: { display: "none" },
   tabLabel: { fontSize: typography.tiny, fontWeight: "700" },
   tabIcon: { minWidth: 32, minHeight: 32, alignItems: "center", justifyContent: "center" },
